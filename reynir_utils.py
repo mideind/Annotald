@@ -27,6 +27,7 @@ In order to use it, you must first install the ReynirPackage,
 """
 
 import os
+from pathlib import Path
 
 from nltk import Tree
 
@@ -41,6 +42,13 @@ except ImportError as e:
     )
 
 import annotald.util as util
+
+
+class SCHEMES:
+    ICEPAHC = "icepahc"
+    REYNIR = "reynir"
+    BOTH = [ICEPAHC, REYNIR]
+
 
 _CASE_MAP = {"nf": "N", "þf": "A", "þgf": "D", "ef": "G"}
 _DEGREE_MAP = {"ms": "R", "evb": "S", "esb": "S", "est": "S"}
@@ -168,7 +176,6 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
             else:
                 children.extend(child)
 
-
         # Merge trees according to:
         # IP-MAT idomsonly IP => (merge IP-MAT IP)
         # !IP idoms IP => (rename IP IP-SUB)
@@ -179,7 +186,7 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
             return children
         ext_children = []
         if xp == "IP-MAT" and children and children[0].label() == "IP":
-            children = [c for c in children[0] ] + (children[1:])
+            children = [c for c in children[0]] + (children[1:])
 
         for child in children:
             label = child.label()
@@ -349,9 +356,14 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
     return [leaf] + extra_leaves
 
 
-def tok_stream_to_null_tree(tok_stream):
+def tok_stream_to_null_icepahc(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
     root = Tree("", [Tree("IP-MAT", [Tree("X", [str(tok)]) for tok in tok_stream])])
+    return root
+
+def tok_stream_to_null_reynir(tok_stream):
+    """ Constuct bare minimal NLTK.Tree from a token stream """
+    root = Tree("P", [Tree("S-MAIN", [Tree("X", [str(tok)]) for tok in tok_stream])])
     return root
 
 
@@ -361,63 +373,86 @@ def insert_id(tree, prefix, index):
              (ID {prefix},.{index}))
     """
     id_str = "{prefix},.{index}".format(prefix=prefix, index=index)
-    tree.insert(1, Tree("ID", [id_str]))
+    tree.insert(len(tree) + 1, Tree("ID", [id_str]))
 
 
-def _reynir_sentence_to_nltk(sent):
+def reynir_sentence_to_icepahc(sent):
     """ Transform a parsed sentence from Reynir _Sentence object to
         an NLTK.Tree parse tree """
     if sent.tree is not None:
         nltk_tree = reynir_tree_to_icepach(sent.tree)
     else:
-        nltk_tree = tok_stream_to_null_tree([tok.txt for tok in sent._s if tok])
+        nltk_tree = tok_stream_to_null_icepahc([tok.txt for tok in sent._s if tok])
     return nltk_tree
 
+def reynir_sentence_to_reynir(sent):
+    if sent.tree is not None:
+        nltk_tree = simpleTree2NLTK(sent.tree)
+    else:
+        nltk_tree = tok_stream_to_null_reynir([tok.txt for tok in sent._s if tok])
+    return nltk_tree
 
-def parse_single(text, affix_lemma=1, id_prefix=None, start_index=1):
+def parse_single(
+    text, affix_lemma=1, id_prefix=None, start_index=1, scheme=SCHEMES.ICEPAHC
+):
     """ Parse a single sentence into mostly IcePaHC conformant parse trees
         using a transformation of reynir's parse trees """
     r = Reynir()
     sent = r.parse_single(text)
-    nltk_tree = _reynir_sentence_to_nltk(sent)
+    if scheme == SCHEMES.ICEPAHC:
+        nltk_tree = reynir_sentence_to_icepahc(sent)
+    else:
+        nltk_tree = reynir_sentence_to_reynir(sent.tree)
     if id_prefix is not None:
         insert_id(nltk_tree, id_prefix, start_index)
     return nltk_tree
 
 
-def parse_text(text, affix_lemma=1, id_prefix=None, start_index=1):
+def parse_text(
+    text, affix_lemma=1, id_prefix=None, start_index=1, scheme=SCHEMES.ICEPAHC
+):
     """ Parse contiguous text into mostly IcePaHC conformant parse trees
         using a transformation of reynir's parse trees """
     r = Reynir()
     dd = r.parse(text)
     for idx, sent in enumerate(dd["sentences"]):
-        nltk_tree = _reynir_sentence_to_nltk(sent)
+        if scheme == SCHEMES.ICEPAHC:
+            nltk_tree = reynir_sentence_to_icepahc(sent)
+        else:
+            nltk_tree = reynir_sentence_to_reynir(sent)
         if id_prefix is not None:
             insert_id(nltk_tree, id_prefix, start_index + idx)
         yield nltk_tree
 
-def annotate_file(in_path):
+
+def annotate_file(in_path, scheme=SCHEMES.ICEPAHC):
     print("Parsing file {0}".format(in_path))
-    dirname = os.path.dirname(in_path)
-    basename = os.path.basename(in_path)
-    out_path = os.path.join(dirname, basename + ".parse")
+    out_path = in_path.with_suffix(".parse")
     print("Output file is {0}".format(out_path))
     with open(in_path, "r") as in_handle:
         text = in_handle.read()
         with open(out_path, "w") as out_handle:
-            for tree in parse_text(text, id_prefix=basename):
+            for tree in parse_text(text, id_prefix=in_path.name, scheme=scheme):
                 formatted_trees = util._formatTree(tree)
                 out_handle.write(formatted_trees)
                 out_handle.write("\n")
+                out_handle.write("\n")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser("Parse a text file of contiguous text into IcePaHC-like parse trees")
+
+    parser = argparse.ArgumentParser(
+        "Parse a text file of contiguous text into IcePaHC-like parse trees"
+    )
 
     def file_type_guard(path):
+        path = Path(path)
         if os.path.isfile(path):
             return path
-        raise argparse.ArgumentError("Expected path to a file but got '{0}'".format(path))
+        raise argparse.ArgumentError(
+            "Expected path to a file but got '{0}'".format(path)
+        )
 
     parser.add_argument(
         "-i",
@@ -428,8 +463,15 @@ if __name__ == '__main__':
         default="default",
         help="Path to input file with contiguous text",
     )
+    parser.add_argument(
+        "-s",
+        "--scheme",
+        dest="scheme",
+        required=False,
+        choices=SCHEMES.BOTH,
+        default=SCHEMES.ICEPAHC,
+        help="Annotation scheme for output trees. Defaults to IcePaHC-like",
+    )
 
     args = parser.parse_args()
-    annotate_file(args.in_path)
-
-
+    annotate_file(args.in_path, scheme=args.scheme)
