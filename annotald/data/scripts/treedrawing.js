@@ -242,7 +242,7 @@ function styleTags(tagNames, css) {
  * Calls to this function should be in the `settings.js` file, grouped in a
  * function called `customCommands`
  *
- * @param {Object} dict a mapping of properties of the keybinding.  Can
+ * @param {Object} binding a mapping of properties of the keybinding.  Can
  * contain:
  *
  * - `keycode`: the numeric keycode for the binding (mandatory)
@@ -253,16 +253,16 @@ function styleTags(tagNames, css) {
  * further arguments to the `addCommand` function are passed to `fn` on each
  * invocation.
  */
-function addCommand(dict, fn) {
+function addCommand(binding, fn) {
     var commandMap;
-    if (dict.ctrl) {
+    if (binding.ctrl) {
         commandMap = ctrlKeyMap;
-    } else if (dict.shift) {
+    } else if (binding.shift) {
         commandMap = shiftKeyMap;
     } else {
         commandMap = regularKeyMap;
     }
-    commandMap[dict.keycode] = {
+    commandMap[binding.keycode] = {
         func: fn,
         args: Array.prototype.slice.call(arguments, 2)
     };

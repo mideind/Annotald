@@ -37,13 +37,186 @@ import re
 import subprocess
 import sys
 import tempfile
+from pprint import pprint
+from xml.etree import ElementTree as ET
 
 # External libraries
-import nltk.tree as T
+import nltk.tree as NLTKTree
+
+CASES = {"nf", "þf", "þgf", "ef"}
+GENDERS = {"kk", "kvk", "hk"}
+NUMBERS = {"et", "ft"}
+PERSONS = {"p1", "p2", "p3"}
+TENSE = {"þt", "nt"}
+DEGREE = {"mst", "esb", "evb"}  # fst
+VOICE = {"mm", "gm"}
+MOOD = {"fh", "lh", "lh", "vh", "bh"}
+MISC = {"sagnb", "subj", "abbrev", "op", "none"}
 
 
 class AnnotaldException(Exception):
     pass
+
+
+class AnnoTree(NLTKTree.Tree):
+    def __init__(self, *args, **kwargs):
+        super(AnnoTree, self).__init__(*args, **kwargs)
+
+    @classmethod
+    def to_html(cls, tree, version, extra_data=None):
+        sisters = []
+        real_root = None
+        for daughter in tree:
+            if daughter.label() == "ID" or daughter.label() == "METADATA":
+                # TODO(AWE): conditional is non-portable
+                sisters.append(daughter)
+            else:
+                if real_root:
+                    print(real_root)
+                    raise AnnotaldException(
+                        "root tree has too many/unknown daughters!: %s" % str(tree)
+                    )
+                else:
+                    real_root = daughter
+        xtra_data = sisters
+        snode = cls.to_html_inner(real_root, version, extra_data=xtra_data)
+        return ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
+
+    @classmethod
+    def to_html_inner(cls, tree, version, extra_data=None):
+        if isinstance(tree[0], str):
+            # Leaf node
+            return cls.terminal_to_html(tree, version, extra_data=extra_data)
+
+        # Regular nonterminal node
+        cssClass = re.sub("[-=][0-9]+$", "", tree.label())
+        classList = " ".join(["snode", cssClass])
+
+        nonterminal = tree.label()
+
+        parts = nonterminal.split("-")
+        nonterminal_class = "nonterminal-{0}".format(parts[0]).lower()
+
+        attrib = {
+            "class": " ".join(["snode", cssClass, nonterminal_class]),
+            "data-nonterminal": nonterminal,
+        }
+
+        # if extra_data:
+            # E.g. [AnnoTree('ID', ['setningar.txt,.1'])]
+        #     attrib["data-metadata"] = safe_json(nodeListToDict(extra_data))
+
+        snode = ET.Element(
+            "div",
+            attrib=attrib
+        )
+        snode.text = nonterminal
+        snode.extend(list(cls.to_html_inner(x, version) for x in tree))
+
+        return snode
+
+    @classmethod
+    def terminal_to_html(cls, tree, version, extra_data=None):
+        if len(tree) > 1:
+            raise AnnotaldException(
+                "Leaf node with more than one " + "daughter!: %s" % str(tree)
+            )
+        cssClass = re.sub("[-=][0-9]+$", "", tree.label())
+
+        flat_terminal = tree.label()
+        text_token = tree[0]
+        lemma = text_token
+
+        parts = split_flat_terminal(flat_terminal)
+        terminal_class = "terminal-{0}".format(parts["cat"]).lower()
+
+        attrib = {("data-" + key): value for (key, value) in parts.items()}
+        attrib.update({
+            "class": " ".join(["snode", cssClass, terminal_class]),
+            "data-text": text_token,
+            "data-lemma": lemma,
+            "data-terminal": flat_terminal,
+        })
+
+        snode = ET.Element(
+            "div",
+            attrib=attrib
+        )
+        snode.text = flat_terminal
+
+        wnode = ET.SubElement(snode, "span", attrib={"class": "wnode"})
+        wnode.text = text_token
+
+        lemma_node = ET.SubElement(snode, "span", attrib={"class": "wnode"})
+        lemma_node.text = lemma
+
+        return snode
+
+
+def split_flat_terminal(term_tok):
+    parts = term_tok.split("_")
+    if len(parts) <= 1:
+        pass
+
+    head = parts[0]
+
+    # Extract case control
+    variants_start = 1
+    case_control = ["", ""]
+    if head == "so":
+        first_variant = parts[1]
+        # case control
+        if first_variant in "012":
+            num_control = int(first_variant)
+            variants_start += num_control + 1
+            # so_0_þt_vh_p1           færi
+            # so_1_þf_þt_vh_p1        tæki mat
+            # so_2_þgf_þf_þt_vh_p1    gæfi honum mat
+            for idx in range(num_control):
+                case_control[idx] = ({parts[2 + idx]} & CASES).pop()
+    variants = set(parts[variants_start:])
+    if head == "fs":
+        case = CASES & variants
+        if case:
+            case_control[0] = case.pop()
+    obj1, obj2 = case_control
+
+    case = CASES & variants
+    gender = GENDERS & variants
+    number = NUMBERS & variants
+    person = PERSONS & variants
+    tense = TENSE & variants
+    degree = DEGREE & variants
+    voice = VOICE & variants
+    mood = MOOD & variants
+    misc = MISC & variants
+    data = {
+        "case": case,
+        "gender": gender,
+        "number": number,
+        "person": person,
+        "tense": tense,
+        "degree": degree,
+        "voice": voice,
+        "mood": mood,
+        "misc": misc,
+        "cat": {head},
+        "obj1": {obj1},
+        "obj2": {obj2},
+    }
+
+    for (k, v) in list(data.items()):
+        data[k] = "_".join(v)
+
+    return data
+
+
+def intersperse(iterable, delimiter):
+    it = iter(iterable)
+    yield (next(it))
+    for item in it:
+        yield delimiter
+        yield item
 
 
 def safe_json(dict):
@@ -54,7 +227,7 @@ def safe_json(dict):
 def queryVersionCookie(treestr, key):
     if treestr == "" or not treestr:
         return None
-    t = T.Tree.fromstring(treestr)[0]
+    t = AnnoTree.Tree.fromstring(treestr)[0]
     if t.label() != "VERSION":
         return
     return _queryVersionCookieInner(t, key)
@@ -77,7 +250,7 @@ def _queryVersionCookieInner(tree, key):
 def updateVersionCookie(treestr, key, val):
     if treestr == "" or not treestr:
         return None
-    tree = T.Tree.fromstring(treestr)
+    tree = AnnoTree.Tree.fromstring(treestr)
     tree = tree[0]
     if tree.label() != "VERSION":
         return
@@ -96,59 +269,7 @@ def updateVersionCookie(treestr, key, val):
 
     ret = dictToMetadata(dd)
     ret.set_label("VERSION")
-    return str(T.Tree('', [ret]))
-
-
-def treeToHtml(tree, version, extra_data = None):
-    if isinstance(tree[0], str):
-        # Leaf node
-        if len(tree) > 1:
-            raise AnnotaldException("Leaf node with more than one " +
-                                    "daughter!: %s" % tree)
-        cssClass = re.sub("[-=][0-9]+$", "", tree.label())
-        res = '<div class="snode ' + cssClass + '">' + tree.label() + \
-              '<span class="wnode">'
-        temp = tree[0].split("-")
-        if version == "dash" and len(temp) > 1 and tree.label() != "CODE":
-            temp = tree[0].split("-")
-            lemma = temp.pop()
-            word = "-".join(temp)
-            if lemma.isdigit() and tree.label() != "NUM":
-                # If the lemma is all numbers, it is probably a trace index.
-                # Do nothing special with it.
-                res += word + "-" + lemma
-            else:
-                res += word + '<span class="lemma">-' + lemma + '</span>'
-        else:
-            res += tree[0]
-        res += '</span></div>'
-        return res
-    elif tree.label() == "":
-        # Root node
-        sisters = []
-        real_root = None
-        for daughter in tree:
-            if daughter.label() == "ID" or daughter.label() == "METADATA":
-                # TODO(AWE): conditional is non-portable
-                sisters.append(daughter)
-            else:
-                if real_root:
-                    raise AnnotaldException(
-                        "root tree has too many/unknown daughters!: %s" % tree)
-                else:
-                    real_root = daughter
-        xtra_data = sisters
-        return treeToHtml(real_root, version, xtra_data)
-    else:
-        cssClass = re.sub("[-=][0-9]+$", "", tree.label())
-        res = '<div class="snode ' + cssClass + '"'
-        if extra_data:
-            res += (' data-metadata="' + safe_json(nodeListToDict(extra_data))
-                    + '"')
-        res += '>' + tree.label() + ' '
-        res += "\n".join([treeToHtml(x, version) for x in tree])
-        res += "</div>"
-        return res
+    return str(AnnoTree.Tree("", [ret]))
 
 
 def labelFromLabelAndMetadata(label, metadata):
@@ -176,31 +297,31 @@ def orthoFromTree(tree):
 
 
 def nodeListToDict(nodes):
-    return metadataToDict(T.Tree("FOO", nodes))
+    return metadataToDict(AnnoTree.Tree("FOO", nodes))
 
 
 def metadataToDict(metadata):
     f = lambda: defaultdict(f)  # A devious way of getting a recursive
-                                # defaultdict
+    # defaultdict
     d = defaultdict(f)
     for datum in metadata:
-        if isinstance(datum[0], T.Tree):
+        if isinstance(datum[0], AnnoTree.Tree):
             d[datum.label()] = metadataToDict(datum)
         else:
             d[datum.label()] = datum[0]
     return d
 
 
-def dictToMetadata(d, label = ""):
+def dictToMetadata(d, label=""):
     if isinstance(d, str):
         return [d]
     keys = list(d.keys())
     l = []
     for k in keys:
-        l.append(T.Tree(k, dictToMetadata(d[k])))
-    l.sort()                    # Not technically needed, except to make
-                                # the output predctable for unit tests
-    return T.Tree(label, l)
+        l.append(AnnoTree.Tree(k, dictToMetadata(d[k])))
+    l.sort()  # Not technically needed, except to make
+    # the output predctable for unit tests
+    return AnnoTree.Tree(label, l)
 
 
 # TODO: unify the calling convention of these fns, so we don't need *args
@@ -218,7 +339,7 @@ def deepTreeToHtml(tree, *args):
             if t.label() == "META":
                 # Find this tree's metadata; we will need it later
                 metadata = t
-            elif isinstance(t[0], T.Tree):
+            elif isinstance(t[0], AnnoTree.Tree):
                 # if this tree has branching daughters, other than META,
                 # then it is not a leaf.
                 isLeaf = False
@@ -226,26 +347,22 @@ def deepTreeToHtml(tree, *args):
     # Find out what to call this node
     theLabel = labelFromLabelAndMetadata(tree.label(), metadata)
     # Start building the result
-    res = '<div class="snode ' + \
-        cssClassFromLabel(theLabel) + '"'
+    res = '<div class="snode ' + cssClassFromLabel(theLabel) + '"'
     if metadata:
         res += ' data-metadata="' + safe_json(metadataToDict(metadata)) + '"'
-    res += '>' + theLabel + ' '
+    res += ">" + theLabel + " "
     if isSimpleLeaf:
-        res += '<span class="wnode">' + \
-            tree[0] + '</span>'
+        res += '<span class="wnode">' + tree[0] + "</span>"
     elif isLeaf:
-        res += '<span class="wnode">' + \
-            orthoFromTree(tree) + '</span>'
+        res += '<span class="wnode">' + orthoFromTree(tree) + "</span>"
     else:
         leafHtml = "".join([deepTreeToHtml(x) for x in tree])
         res += leafHtml
-    res += '</div>'
+    res += "</div>"
     return res
 
 
-def writeTreesToFile(meta, trees, filename, reformat = False,
-                     fix_indices = False):
+def writeTreesToFile(meta, trees, filename, reformat=False, fix_indices=False):
     if not isinstance(trees, str):
         raise AnnotaldException("writeTreesToFile got a non-string!")
 
@@ -253,12 +370,12 @@ def writeTreesToFile(meta, trees, filename, reformat = False,
     trees = [x for x in trees if x != ""]
 
     if reformat or fix_indices:
-        trees = [T.Tree.fromstring(s) for s in trees]
+        trees = [AnnoTree.Tree.fromstring(s) for s in trees]
         if fix_indices:
             trees = list(map(rewriteIndices, trees))
         trees = list(map(_formatTree, trees))
         try:
-            meta = _formatTree(T.Tree(meta))
+            meta = _formatTree(AnnoTree.Tree(meta))
         except:
             # the metadata tree did not parse
             pass
@@ -279,7 +396,7 @@ def is_leaf(tree):
     return len(tree) == 1 and isinstance(tree[0], str)
 
 
-def _formatTree(tree, indent = 0):
+def _formatTree(tree, indent=0):
     # Should come from lovett
     if is_leaf(tree):
         # This is a leaf node
@@ -288,7 +405,8 @@ def _formatTree(tree, indent = 0):
         s = "(%s " % (str(tree.label()))
         l = len(s)
         leaves = ("\n" + " " * (indent + l)).join(
-            [_formatTree(x, indent + l) for x in tree])
+            [_formatTree(x, indent + l) for x in tree]
+        )
         return "%s%s%s" % (s, leaves, ")")
 
 
@@ -297,18 +415,24 @@ def corpusSearchValidate(queryFile):  # pragma: no cover
     # TODO: test the unicode part
     def corpusSearchValidateInner(version, trees):
         # Should use writetreestofile for unicode thing
-        tf = tempfile.NamedTemporaryFile(delete = False)
+        tf = tempfile.NamedTemporaryFile(delete=False)
         name = tf.name
         writer = codecs.getwriter("utf-8")
         write_handle = writer(tf)
         write_handle.write(trees)
         tf.close()
         # TODO: this will break when merging anton's branch
-        cmdline = 'java -classpath ' + \
-                  pkg_resources.resource_filename(
-                      "annotald", 'CS_Tony_oct19.jar') + \
-                  ' csearch.CorpusSearch ' + queryFile + ' ' + name + \
-                  ' -out ' + name + '.out'
+        cmdline = (
+            "java -classpath "
+            + pkg_resources.resource_filename("annotald", "CS_Tony_oct19.jar")
+            + " csearch.CorpusSearch "
+            + queryFile
+            + " "
+            + name
+            + " -out "
+            + name
+            + ".out"
+        )
         subprocess.check_call(cmdline.split(" "))
 
         with open(name + ".out") as f:
@@ -377,8 +501,7 @@ def _squashAt(a, b):
 def _isEmpty(tuple):
     if tuple[1] == "CODE":
         return True
-    elif tuple[0][0] == "*" or \
-         (tuple[0] == "0" and tuple[1] != "NUM"):
+    elif tuple[0][0] == "*" or (tuple[0] == "0" and tuple[1] != "NUM"):
         return True
     return False
 
@@ -390,8 +513,8 @@ def _stripLemma(s):
         return s
 
 
-def _getText(tree_text, strip_lemmata = False):
-    tree = T.Tree(tree_text)
+def _getText(tree_text, strip_lemmata=False):
+    tree = AnnoTree.Tree(tree_text)
     to_delete = []
     for i, t in enumerate(tree):
         if t.label() in ["ID", "METADATA"]:
@@ -477,14 +600,14 @@ def _shouldIndexLeaf(tree):
         if not isinstance(tree[0], str):
             return False
         s = tree[0]
-        return re.split("[-=]", s)[0] in ["*T*", "*ICH*", "*CL*", "*"]
+        return re.split("[-=]", s)[0] in ["*AnnoTree*", "*ICH*", "*CL*", "*"]
     except IndexError as e:
         # Github issue #45
         print("shouldIndexLeaf error, tree is: ")
         print(tree.pprint())
         print("Whole tree (from root): ")
         r = tree.root
-        if not isinstance(r, T.Tree):
+        if not isinstance(r, AnnoTree.Tree):
             r = r()
         print(r.pprint())
         raise e

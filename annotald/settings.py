@@ -6,7 +6,7 @@ extraJavascripts = []
 
 # Set this to True if you are an Annotald developer or otherwise need to
 # debug Annotald's jQuery code
-debugJs = False
+debugJs = True
 
 # TODO: add an option to include waxeye files, which we will distribute?
 

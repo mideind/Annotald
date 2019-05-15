@@ -69,7 +69,9 @@ body {
     /* This needs to override any user-supplied background colors, since
      * selection is more important.
      */
-    background-color: #4682B4 !important;
+    /* background-color: #4682B4 !important; */
+    filter: brightness(60%);
+                                         /* !important; */
 }
 
 .collapsed .snode {
@@ -355,4 +357,207 @@ body {
     background-color: #D2B48C;
     border: 1px solid black;
     padding: 4px;
+}
+
+/* Greynir nonterminal styling */
+
+div.nonterminal-s {
+    background: #f0dd8e;
+    border-left: 4px solid #cc8b2c;
+    #f0dd8
+}
+
+.nonterminal-adjp {
+    /* background: #5cb-85c; */
+    background: #bcd8ac;
+    border-left: 4px solid #3a963a;
+}
+
+.nonterminal-advp {
+    background: #bcd8ac;
+    border-left: 4px solid #3a963a;
+}
+
+div.nonterminal-ip {
+    background: #f0dd8e;
+    border-left: 4px solid #cc8b2c;
+}
+
+.nonterminal-np {
+    /* background: #337-ab7; */
+    background: #93bae7;
+    border-left: 4px solid #115895;
+}
+
+.nonterminal-p {
+    background: #aaa0aa;
+    border-left: 4px solid #443944;
+}
+
+.nonterminal-pp {
+    background: #aaa0aa;
+    border-left: 4px solid #443944;
+}
+
+.nonterminal-vp {
+    /* background: #d95-34f; */
+    background: #ffa19d;
+    border-left: 4px solid #b7312d;
+}
+
+/* Greynir terminal styling */
+
+.terminal-x {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-no {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-abfn {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-fn {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-sérnafn {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-person {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-pfn {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-entity {
+    background: #a8cdff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-ao {
+    background: #bffaaf;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-lo {
+    background: #bffaaf;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-to {
+    background: #bffaaf;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-eo {
+    background: #bffaaf;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-ártal {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-dags {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-fs {
+    background: #cccccc;
+    border-left: 4px solid #443944;
+}
+
+.terminal-fyrirtæki {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-gata {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-gr {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-\. {
+    background: #ccc;
+    border-left: 4px solid #443944;
+}
+
+.terminal-prósenta {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-raðnr {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-so {
+    background: #ffd1cd;
+    border-left: 4px solid #b7312d;
+}
+
+.terminal-nhm {
+    background: #ffd1cd;
+    border-left: 4px solid #b7312d;
+}
+
+.terminal-spao {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-st {
+    background: #f0eead;
+    border-left: 4px solid #cc8b2c;
+}
+
+.terminal-stt {
+    background: #f0eead;
+    border-left: 4px solid #cc8b2c;
+}
+
+.terminal-tala {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-tímapunktur {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-tími {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-töl {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-uh {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
 }

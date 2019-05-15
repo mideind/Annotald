@@ -141,7 +141,7 @@ def simpleTree2NLTK(tt):
         # Punctuation
         return Tree(tt.text, [tt.text])
     # Terminal
-    return Tree(tt.terminal, [tt.text])
+    return Tree(tt.terminal_with_all_variants, [tt.text])
 
 
 def treemap(tree, nonterm_fn, term_fn):
@@ -390,7 +390,7 @@ def reynir_sentence_to_reynir(sent):
         nltk_tree = simpleTree2NLTK(sent.tree)
     else:
         nltk_tree = tok_stream_to_null_reynir([tok.txt for tok in sent._s if tok])
-    return nltk_tree
+    return Tree("", [ nltk_tree ])
 
 def parse_single(
     text, affix_lemma=1, id_prefix=None, start_index=1, scheme=SCHEMES.ICEPAHC
@@ -429,9 +429,9 @@ def annotate_file(in_path, scheme=SCHEMES.ICEPAHC):
     print("Parsing file {0}".format(in_path))
     out_path = in_path.with_suffix(".parse")
     print("Output file is {0}".format(out_path))
-    with open(in_path, "r") as in_handle:
+    with in_path.open(mode="r") as in_handle:
         text = in_handle.read()
-        with open(out_path, "w") as out_handle:
+        with out_path.open(mode="w") as out_handle:
             for tree in parse_text(text, id_prefix=in_path.name, scheme=scheme):
                 formatted_trees = util._formatTree(tree)
                 out_handle.write(formatted_trees)
@@ -448,7 +448,7 @@ if __name__ == "__main__":
 
     def file_type_guard(path):
         path = Path(path)
-        if os.path.isfile(path):
+        if path.is_file():
             return path
         raise argparse.ArgumentError(
             "Expected path to a file but got '{0}'".format(path)
