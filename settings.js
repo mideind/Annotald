@@ -238,18 +238,20 @@ const CATEGORY_TO_VARIANT_NAMES = {
     sérnafn: ["case"],
 };
 
-const GENDER = ["kk", "kvk", "hk", ""];
-const NUMBER = ["et", "ft", ""];
-const CASE = ["nf", "þf", "þgf", "ef", ""];
+const GENDER = ["kk", "kvk", "hk"];
+const NUMBER = ["et", "ft"];
+const CASE = ["nf", "þf", "þgf", "ef"];
 const ARTICLE = ["gr", ""];
-const PERSON = ["p1", "p2", "p3", ""];  // note: gender and person can be mutually exclusive
-const MOOD = ["fh", "vh", "nh", "bh", ""];
+const PERSON = ["p1", "p2", "p3"];  // note: iirc gender and person can be mutually exclusive
+const MOOD = ["fh", "vh", "nh", "bh"];
 const TENSE = ["nt", "þt", ""];
-const DEGREE = ["fst", "mst", "est", ""];
+const DEGREE = ["fst", "mst", "est"];
 const STRENGTH = ["vb", "sb", ""];
 const VOICE = ["mm", "gm", ""];  // "þm"
 const CONTROL = ["nf", "þf", "þgf", "ef", ""];
 const SUPINE = ["sagnb", ""];
+// TODO: _op
+// TODO: _subj
 
 const VARIANT_NAME_TO_SUBVARIANTS = {
     gender: GENDER,
@@ -274,17 +276,110 @@ const NONTERMINAL_NAME_TO_CYCLE = {
     VP: VP_CYCLE
 };
 
+/*
+ * Multiplex function by selection type
+ */
+function with_sel_term(sel_fn_map) {
+    let sel = get_selection();
+    if (sel.terminal && sel_fn_map.terminal) {
+        sel_fn_map.terminal();
+    } else if (sel.nonterminal && sel_fn_map.nonterminal) {
+        sel_fn_map.nonterminal();
+    }
+}
+
+/*
+ * Propagate case change to relevant neighbours
+ */
+function propagate_case (dom_node) {
+    console.log("Propagating case");
+    if (node.terminal) {
+        // case for terminal, determine parent, goto nonterminal case
+    } else {
+        // return propagate_case_from_parent(node);
+    }
+    return ;
+};
+
+function propagate_case_from_parent (node, new_case) {
+    // when parent is targeted directly, the new target case is undetermined
+    // an option is then to extract the case from the first terminal and cycle it
+
+    /* ADJP
+       Can stand alone, e.g. as complement to copula
+       Hann verður góður
+       Not a common parse error
+     */
+
+    /* ADVP
+       Some adverbs can have cases?
+     */
+
+    /* NP
+       Case changes should always propagate to terminals:
+     */
+
+    /* PP
+       controls case for governed NP
+       note: case cycling should skip null case
+     */
+
+    /* For reference
+       no: ["number", "case", "gender", "article"],
+       abfn: ["number", "case", "gender"],
+       fn: ["number", "case", "gender"],
+       pfn: ["number", "case", "gender"],
+       gr: ["number", "case", "gender"],
+       tala: ["number", "case", "gender"],
+       töl: ["number", "case", "gender"],
+       to: ["number", "case", "gender"],
+       lo: ["number", "case", "gender", "degree", "strength"],
+       so: ["number", "tense", "supine", "mood",
+            "voice", "person", "obj1", "obj2"], // what about _subj ?
+       fs: ["obj1"],
+       person: ["case", "gender"],
+       raðnr: ["case", "gender"],
+       sérnafn: ["case"],
+     */
+
+    /* VP
+       This should require special handling, since only the main verb can control these
+       and not auxiliary verbs, ergo need to determine head verb
+     */
+
+    /* Co-inflection (when sharing same parent IP)
+
+       NP-SUBJ.number and VP.number
+       NP-SUBJ.person and VP.person (pronouns)
+       NP-OBJ.case and VP.obj1
+       NP-IOBJ.case and VP.obj2
+    */
+    console.log("propagating_case_from_parent:", new_case);
+    for (leaf of node.children.filter((c) => c.terminal)) {
+        console.log(leaf);
+        if (leaf.variants.case) {
+            leaf.variants.case = new_case;
+        }
+    }
+    return node;
+}
+
 function cycle_nonterminal_category (dom_node) {
     if (!dom_node.dataset.nonterminal) {
         return
     }
 
     let cycle = NONTERMINAL_CYCLE;
-    let item = dom_node.dataset.nonterminal;
+    let item = node.nonterminal;
 
-    let curr_idx = cycle.indexOf(item);
-    let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    let next_item = cycle[next_idx];
+    // let curr_idx = cycle.indexOf(item);
+    // let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
+    // let next_item = cycle[next_idx];
+
+    let next_item = array_cycle_next_elem(
+        NONTERMINAL_CYCLE,
+        nt_name
+    );
 
     let node = dom_node_to_tree(dom_node);
     node.nonterminal = next_item;
@@ -300,15 +395,28 @@ function cycle_nonterminal_variant(dom_node) {
     let node = dom_node_to_tree(dom_node);
     let nt_name = node.nonterminal.split("-")[0];
 
-    let cycle = NONTERMINAL_NAME_TO_CYCLE[nt_name];
-    let item = node.nonterminal;
-    let curr_idx = cycle.indexOf(item);
-    let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    let next_item = cycle[next_idx];
+    // let cycle = NONTERMINAL_NAME_TO_CYCLE[nt_name];
+    // let item = node.nonterminal;
+    // let curr_idx = cycle.indexOf(item);
+    // let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
+    // let next_item = cycle[next_idx];
+
+    let next_item = array_cycle_next_elem(
+        NONTERMINAL_NAME_TO_CYCLE[nt_name],
+        nt_name
+    );
+
 
     node.nonterminal = next_item;
     let new_dom_node = tree_to_dom_elem(node);
     $(dom_node).replaceWith($(new_dom_node));
+}
+
+function array_cycle_next_elem(arr, curr_elem) {
+    let curr_idx = arr.indexOf(curr_elem);
+    let next_idx = curr_idx >= 0 ? (curr_idx + 1) % arr.length : 0;
+    let next_elem = arr[next_idx];
+    return next_elem;
 }
 
 function cycle_terminal_category (node) {
@@ -316,11 +424,16 @@ function cycle_terminal_category (node) {
         return false;
     }
 
-    let cycle = TERMINAL_CYCLE;
-    let item = node.terminal;
-    let curr_idx = cycle.indexOf(item);
-    let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    let next_item = cycle[next_idx];
+    // let cycle = TERMINAL_CYCLE;
+    // let item = node.terminal;
+    // let curr_idx = cycle.indexOf(item);
+    // let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
+    // let next_item = cycle[next_idx];
+
+    let next_item = array_cycle_next_elem(
+        TERMINAL_CYCLE,
+        node.terminal
+    );
 
     node.cat = next_item;
     let next_variants = CATEGORY_TO_VARIANT_NAMES[next_item];
@@ -362,7 +475,7 @@ function cycle_terminal_category2 (dom_node) {
 function terminal_to_flat_terminal(terminal) {
     let variants = terminal.variants;
     let head = [];
-    if (terminal.cat === "so" || terminal.cat === "fs") {
+    if (terminal.cat === "so") {
         let governs = [];
         variants.obj1 ? governs.push(variants.obj1) : 0;
         governs && variants.obj2 ? governs.push(variants.obj2) : 0;
@@ -370,6 +483,9 @@ function terminal_to_flat_terminal(terminal) {
         let governs_str = governs.join("_");
         governs_str ? head.push(governs_str) : 0;
         head = head.join("_");
+    } else if (terminal.cat === "fs") {
+        let suffix = variants.obj1 ? ("_" + variants.obj1) : "";
+        head = "" + terminal.cat + suffix;
     } else {
         head = terminal.cat;
     }
@@ -447,28 +563,99 @@ function tree_to_dom_elem (obj) {
     return $(elem).first().get(0);
 }
 
-function dom_node_to_tree (dom_node) {
-    if (!dom_node.dataset.nonterminal && !dom_node.dataset.terminal) {
+
+/*
+   Extract whole dom syntax tree and convert it to a doubly linked plain tree object,
+   return the current selected node
+*/
+function get_path_to_root(elem) {
+    let parent_elem = elem.parentElement;
+    if (!parent_elem.dataset.nonterminal && !parent_elem.dataset.terminal) {
+        return {
+            root: elem,
+            path: []
+        };
+    }
+    let result = get_path_to_root(parent_elem);
+    result.path.push(get_child_index(elem));
+    return result;
+}
+
+function get_child_index(elem) {
+    return [...elem.parentNode.children].indexOf(elem);
+}
+
+function traverse_path(node, path) {
+    let cursor = node;
+    for (let child_index of path) {
+        cursor = cursor.children[child_index];
+    }
+    return cursor;
+}
+
+/*
+   Extract whole dom syntax tree and convert it to a doubly linked plain tree object,
+   return the current selected node
+ */
+function get_rooted_selection () {
+    console.log("Getting rooted selection");
+    let sel_elem = startnode;
+    if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
         console.log("Unexpected dom object in dom_node_to_tree");
         return;
     }
 
-    function dom_nonterminal_elem_to_obj(dom_node) {
+    let path_obj = get_path_to_root(sel_elem);
+    let root_node = dom_node_to_tree(path_obj.root);
+    let path = path_obj.path;
+    let sel_node = traverse_path(root_node, path);
+
+    return sel_node;
+}
+
+function get_rooted_by_elem (elem) {
+    console.log("Getting rooted selection");
+    let sel_elem = startnode;
+    if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
+        console.log("Unexpected dom object in dom_node_to_tree");
+        return;
+    }
+
+    let path_obj = get_path_to_root(sel_elem);
+    let root_node = dom_node_to_tree(path_obj.root);
+    let path = path_obj.path;
+    let sel_node = traverse_path(root_node, path);
+
+    return sel_node;
+}
+
+/*
+   Extracts dom element (syntax tree) node and converts it to a plain tree object
+ */
+function dom_node_to_tree (elem) {
+    if (!elem.dataset.nonterminal && !elem.dataset.terminal) {
+        console.log("Unexpected dom object in dom_node_to_tree");
+        return;
+    }
+
+    function dom_nonterminal_elem_to_obj(elem) {
         return {
-            nonterminal: dom_node.dataset.nonterminal,
+            nonterminal: elem.dataset.nonterminal,
             children: []
         };
     }
 
-    if (dom_node.dataset.terminal) {
-        return dom_terminal_elem_to_obj(dom_node);
+    if (elem.dataset.terminal) {
+        return dom_terminal_elem_to_obj(elem);
     }
 
-    let nt = dom_nonterminal_elem_to_obj(dom_node);
-    for (child of dom_node.children) {
-        nt.children.push(dom_node_to_tree(child));
+    let nt_node = dom_nonterminal_elem_to_obj(elem);
+    for (let child_elem of elem.children) {
+        let child_node = dom_node_to_tree(child_elem)
+        child_node.parent = nt_node;
+        nt_node.children.push(child_node);
     }
-    return nt
+    return nt_node;
 }
 
 /*
@@ -516,18 +703,23 @@ function delete_subvariant_by_index (node, var_idx) {
 }
 
 function cycle_subvariant_by_variant_name (node, var_name) {
-    // debugger;
     if (!VARIANT_NAME_TO_SUBVARIANTS[var_name]) {
         console.log(`Unknown variant name '${var_name}'`);
         return;
     }
 
-    let num_subvars = VARIANT_NAME_TO_SUBVARIANTS[var_name].length;
+    // let num_subvars = VARIANT_NAME_TO_SUBVARIANTS[var_name].length;
 
-    let subvar_idx = VARIANT_NAME_TO_SUBVARIANTS[var_name].indexOf(node.variants[var_name]);
-    let next_idx = subvar_idx >= 0 ? (subvar_idx + 1) % num_subvars : 0;
+    // let subvar_idx = VARIANT_NAME_TO_SUBVARIANTS[var_name].indexOf(node.variants[var_name]);
+    // let next_idx = subvar_idx >= 0 ? (subvar_idx + 1) % num_subvars : 0;
 
-    node.variants[var_name] =  VARIANT_NAME_TO_SUBVARIANTS[var_name][next_idx];
+    // node.variants[var_name] =  VARIANT_NAME_TO_SUBVARIANTS[var_name][next_idx];
+
+    node.variants[var_name] = array_cycle_next_elem(
+        VARIANT_NAME_TO_SUBVARIANTS[var_name],
+        node.variants[var_name]
+    );
+
     node.terminal = terminal_to_flat_terminal(node);
 
     return node
@@ -544,18 +736,23 @@ function cycle_subvariant_by_variant_index (node, var_idx) {
         return false;
     }
 
-    let variant_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
-    let num_subvars = VARIANT_NAME_TO_SUBVARIANTS[variant_name].length;
+    let var_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
+    node.variants[var_name] = array_cycle_next_elem(
+        VARIANT_NAME_TO_SUBVARIANTS[var_name],
+        node.variants[var_name]
+    );
 
-    let subvar_idx = VARIANT_NAME_TO_SUBVARIANTS[variant_name].indexOf(node.variants[variant_name]);
-    let next_idx = subvar_idx >= 0 ? (subvar_idx + 1) % num_subvars : 0;
+    // let variant_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
+    // let num_subvars = VARIANT_NAME_TO_SUBVARIANTS[variant_name].length;
 
-    node.variants[variant_name] =  VARIANT_NAME_TO_SUBVARIANTS[variant_name][next_idx];
+    // let subvar_idx = VARIANT_NAME_TO_SUBVARIANTS[variant_name].indexOf(node.variants[variant_name]);
+    // let next_idx = subvar_idx >= 0 ? (subvar_idx + 1) % num_subvars : 0;
+
+    // node.variants[variant_name] =  VARIANT_NAME_TO_SUBVARIANTS[variant_name][next_idx];
+
     node.terminal = terminal_to_flat_terminal(node);
 
-    return node
-    // let new_dom_node = terminal_obj_to_dom_elem(node);
-    // $(dom_node).replaceWith(new_dom_node);
+    return node;
 }
 
 /*
@@ -631,9 +828,8 @@ function get_selected_dom_terminal() {
 function get_selection() {
     console.log("get_selection: begin");
     if (!startnode) {
-        console.log("get_selection:", "none");
-        console.log("\n");
-        return "none";
+        console.log("get_selection: none");
+        return "single";
     }
     let start = dom_node_to_tree(startnode);
     console.log("get_selection: start:", start.terminal ? "terminal" : "nonterminal");
@@ -643,7 +839,7 @@ function get_selection() {
         console.log("get_selection: end:", end.terminal ? "terminal" : "nonterminal");
     }
     console.log("\n");
-}
+};
 
 let leaf_example_no = {
     text: "bílnum",
@@ -696,7 +892,7 @@ let leaf_example_so_2 = {
 
 let tree_example = {
     nonterminal: "NP-SUBJ",
-    children: [leaf_example_no]
+    children: [leaf_example_no, leaf_example_so_1] // syntactically wrong, just for demo and debug purposes
 };
 
 
@@ -773,6 +969,8 @@ function customCommands() {
     addCommand({ keycode: KEYS.R, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 3);
     addCommand({ keycode: KEYS.A, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 4);
     addCommand({ keycode: KEYS.S, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 5);
+
+    addCommand({ keycode: KEYS.F}, get_rooted_selection);
 
     addCommand({ keycode: KEYS.Q }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 0);
     addCommand({ keycode: KEYS.W }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 1);

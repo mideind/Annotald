@@ -532,21 +532,43 @@ function selectNode(node, force) {
             node = node.parentNode;
         }
 
-        if (node == startnode) {
+        if (startnode === null) {
+            // no current selection
+            startnode = node;
+        } else if (node == startnode) {
+            // deselect first node
             startnode = null;
             if (endnode) {
                 startnode = endnode;
                 endnode = null;
             }
-        } else if (startnode === null) {
-            startnode = node;
         } else {
             if (startnode && (last_event_was_mouse || force)) {
+                // current selection exists
                 if (node == endnode) {
+                    // deselect last node
+                    endnode = null;
+                } else if (endnode) {
+                    // current selection is many siblings, either end was not selected
+                    startnode = null;
                     endnode = null;
                 } else {
-                    endnode = node;
-                }
+                    // startnode exists, new node selected
+                    let parent_children = [...startnode.parentElement.children];
+                    let is_parent_inside_tree = startnode.parentElement.id !== "sn0";
+                    if ( parent_children.includes(node) && is_parent_inside_tree ) {
+                        let child_idx_start = parent_children.indexOf(startnode);
+                        let child_idx_end = parent_children.indexOf(node);
+                        let startnode_ = child_idx_start < child_idx_end ? startnode : node;
+                        let endnode_ = child_idx_start < child_idx_end ? node : startnode;
+                        startnode = startnode_;
+                        endnode = endnode_;
+                    } else {
+                        // startnode exists, but new node was not a sibling
+                        startnode = null;
+                        endnode = null;
+                    }
+               }
             } else {
                 endnode = null;
                 startnode = node;
@@ -577,12 +599,15 @@ function updateSelection() {
     // update selection display
     $('.snodesel').removeClass('snodesel');
 
-    if (startnode) {
+    if (startnode && endnode) {
+        let runner = startnode;
+        $(runner).addClass('snodesel');
+        while (runner != endnode) {
+            runner = runner.nextElementSibling;
+            $(runner).addClass('snodesel');
+        }
+    } else if (startnode) {
         $(startnode).addClass('snodesel');
-    }
-
-    if (endnode) {
-        $(endnode).addClass('snodesel');
     }
 
     updateMetadataEditor();

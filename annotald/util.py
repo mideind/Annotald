@@ -147,8 +147,8 @@ class AnnoTree(NLTKTree.Tree):
         wnode = ET.SubElement(snode, "span", attrib={"class": "wnode"})
         wnode.text = text_token
 
-        lemma_node = ET.SubElement(snode, "span", attrib={"class": "wnode"})
-        lemma_node.text = lemma
+        # lemma_node = ET.SubElement(snode, "span", attrib={"class": "wnode"})
+        # lemma_node.text = lemma
 
         return snode
 
