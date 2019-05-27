@@ -437,13 +437,18 @@ div.nonterminal-ip {
     border-left: 4px solid #115895;
 }
 
-.terminal-pfn {
+.terminal-entity {
     background: #a8cdff;
     border-left: 4px solid #115895;
 }
 
-.terminal-entity {
-    background: #a8cdff;
+.terminal-pfn {
+    background: #8de5ef;
+    border-left: 4px solid #115895;
+}
+
+.terminal-töl {
+    background: #8de5ef;
     border-left: 4px solid #115895;
 }
 
@@ -548,11 +553,6 @@ div.nonterminal-ip {
 }
 
 .terminal-tími {
-    background: #FFFFFF;
-    border-left: 4px solid #FF0000;
-}
-
-.terminal-töl {
     background: #FFFFFF;
     border-left: 4px solid #FF0000;
 }

@@ -39,6 +39,7 @@ var caseTags = ["N","NS","NPR","NPRS",
                 "Q","QR","QS"];
 var casePhrases = ["NP","QP","ADJP"];
 var caseMarkers = ["N", "A", "D", "G"];
+
 /*
  * Which labels are barriers to recursive case assignment.
  */
@@ -82,6 +83,10 @@ var ipnodes = ["IP-SUB","IP-MAT","IP-IMP","IP-INF","IP-PPL","RRC"];
 // appear allowing the comment to be edited as text.
 var commentTypes = ["COM", "TODO", "MAN"];
 
+function not_implemented_fn () {
+    console.log("Not implemented yet");
+};
+
 // Key codes for legibility
 const KEYS = {
     SPACE: 32,
@@ -124,6 +129,9 @@ const KEYS = {
     SOLIDUS: 192,
     GRAVE: 192
 };
+
+const FORWARD = true;
+const BACKWARD = false;
 
 const NONTERMINAL_CYCLE = [
     "ADJP",
@@ -207,7 +215,8 @@ const TERMINAL_CYCLE = [
     "tími",
     "to",
     "töl",
-    "uh"
+    "uh",
+    "."
 ];
 
 const TERMINAL_VARIANT_NAMES = [
@@ -221,10 +230,11 @@ const TERMINAL_VARIANT_NAMES = [
 ];
 
 const CATEGORY_TO_VARIANT_NAMES = {
+    ao: ["degree"],
     no: ["number", "case", "gender", "article"],
     abfn: ["number", "case", "gender"],
     fn: ["number", "case", "gender"],
-    pfn: ["number", "case", "gender"],
+    pfn: ["number", "case", "gender", "person"],
     gr: ["number", "case", "gender"],
     tala: ["number", "case", "gender"],
     töl: ["number", "case", "gender"],
@@ -245,7 +255,7 @@ const ARTICLE = ["gr", ""];
 const PERSON = ["p1", "p2", "p3"];  // note: iirc gender and person can be mutually exclusive
 const MOOD = ["fh", "vh", "nh", "bh"];
 const TENSE = ["nt", "þt", ""];
-const DEGREE = ["fst", "mst", "est"];
+const DEGREE = ["fst", "mst", "est", ""];
 const STRENGTH = ["vb", "sb", ""];
 const VOICE = ["mm", "gm", ""];  // "þm"
 const CONTROL = ["nf", "þf", "þgf", "ef", ""];
@@ -276,16 +286,68 @@ const NONTERMINAL_NAME_TO_CYCLE = {
     VP: VP_CYCLE
 };
 
+const TERMINAL_CAT_TO_NONTERMINAL = {
+    abfn: "NP",
+    ao: "ADVP",
+    ártal: "ADVP",
+    dags: "ADVP",
+    entity: "NP",
+    eo: "ADJP",
+    fn: "NP",
+    fs: "PP",
+    fyrirtæki: "NP",
+    gata: "NP-ADDRESS",
+    gr: "NP",
+    lo: "ADJP",
+    nhm: "VP",
+    no: "NP",
+    p: "S",
+    person: "NP",
+    pfn: "NP",
+    prósenta: "ADJP",
+    raðnr: "ADJP",
+    sérnafn: "NP",
+    so: "VP",
+    spao: "ADVP",
+    st: "S",
+    stt: "S-REF",
+    tala: "NP",
+    tímapunktur: "ADVP",
+    tími: "ADVP",
+    to: "ADJP",
+    töl: "NP",
+    uh: "ADVP",
+    ".": "P",
+};
+
+const NONTERMINAL_CAT_TO_NONTERMINAL = {
+    ADJP: "NP",
+    ADVP: "ADVP",
+    IP: "S",
+    NP: "IP",
+    P: "P",
+    PP: "NP",
+    S: "S",
+    VP: "IP",
+};
+
 /*
- * Multiplex function by selection type
+ * Get selected elems, convert to rooted trees
  */
-function with_sel_term(sel_fn_map) {
-    let sel = get_selection();
-    if (sel.terminal && sel_fn_map.terminal) {
-        sel_fn_map.terminal();
-    } else if (sel.nonterminal && sel_fn_map.nonterminal) {
-        sel_fn_map.nonterminal();
+function get_selection () {
+    if (!startnode) {
+        return false;
     }
+    let start_sel = get_rooted_node_by_elem(startnode);
+    let multi_sel = {
+        start: start_sel,
+        is_multi: false
+    };
+    if (endnode) {
+        multi_sel.end = get_rooted_node_by_elem(endnode);
+        multi_sel.is_multi = true;
+    }
+    return multi_sel;
 }
 
 /*
@@ -364,109 +426,64 @@ function propagate_case_from_parent (node, new_case) {
     return node;
 }
 
-function cycle_nonterminal_category (dom_node) {
-    if (!dom_node.dataset.nonterminal) {
-        return
-    }
+function cycle_nonterminal_category (forward, sel) {
+    let node = sel.start.node;
 
-    let cycle = NONTERMINAL_CYCLE;
-    let item = node.nonterminal;
-
-    // let curr_idx = cycle.indexOf(item);
-    // let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    // let next_item = cycle[next_idx];
-
+    let old = node.nonterminal;
     let next_item = array_cycle_next_elem(
         NONTERMINAL_CYCLE,
-        nt_name
+        nt_name,
+        forward
     );
 
-    let node = dom_node_to_tree(dom_node);
     node.nonterminal = next_item;
-    let new_dom_node = tree_to_dom_elem(node);
-    $(dom_node).replaceWith($(new_dom_node));
+    return old !== new_item ? node : false;
 }
 
-function cycle_nonterminal_variant(dom_node) {
-    if (!dom_node.dataset.nonterminal) {
-        return
-    }
+function cycle_nonterminal_variant(forward, sel) {
+    let node = sel.start.node;
 
-    let node = dom_node_to_tree(dom_node);
     let nt_name = node.nonterminal.split("-")[0];
-
-    // let cycle = NONTERMINAL_NAME_TO_CYCLE[nt_name];
-    // let item = node.nonterminal;
-    // let curr_idx = cycle.indexOf(item);
-    // let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    // let next_item = cycle[next_idx];
-
-    let next_item = array_cycle_next_elem(
+    let old = node.nonterminal;
+    let new_item = array_cycle_next_elem(
         NONTERMINAL_NAME_TO_CYCLE[nt_name],
-        nt_name
+        old,
+        forward
     );
 
-
-    node.nonterminal = next_item;
-    let new_dom_node = tree_to_dom_elem(node);
-    $(dom_node).replaceWith($(new_dom_node));
+    node.nonterminal = new_item;
+    return old !== new_item ? node : false;
 }
 
-function array_cycle_next_elem(arr, curr_elem) {
+/*
+ * Get next element in array after or before given element
+ */
+function array_cycle_next_elem(arr, curr_elem, forward) {
     let curr_idx = arr.indexOf(curr_elem);
-    let next_idx = curr_idx >= 0 ? (curr_idx + 1) % arr.length : 0;
-    let next_elem = arr[next_idx];
-    return next_elem;
+    let dir = forward ? 1 : -1;
+    let next_idx = curr_idx >= 0 ? (curr_idx + dir) % arr.length : 0;
+    next_idx = next_idx >= 0 ? next_idx : next_idx + arr.length;
+    return arr[next_idx];
 }
 
-function cycle_terminal_category (node) {
-    if (!node || !node.terminal) {
-        return false;
-    }
+function cycle_terminal_category (forward, sel) {
+    let node = sel.start.node;
 
-    // let cycle = TERMINAL_CYCLE;
-    // let item = node.terminal;
-    // let curr_idx = cycle.indexOf(item);
-    // let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    // let next_item = cycle[next_idx];
-
-    let next_item = array_cycle_next_elem(
+    let old = node.terminal;
+    let new_item = array_cycle_next_elem(
         TERMINAL_CYCLE,
-        node.terminal
+        old,
+        forward
     );
 
-    node.cat = next_item;
+    node.cat = new_item;
     let next_variants = CATEGORY_TO_VARIANT_NAMES[next_item];
     for (var_name of TERMINAL_VARIANT_NAMES) {
         node.variants[name] = next_variants.indexOf(var_name) > 0 ? node.variants[name] : "";
     }
     node.terminal = terminal_to_flat_terminal(node);
 
-    return node;
-}
-
-function cycle_terminal_category2 (dom_node) {
-    if (!dom_node.dataset.terminal) {
-        return
-    }
-
-    let node = dom_terminal_elem_to_obj(dom_node);
-
-    let cycle = TERMINAL_CYCLE;
-    let item = node.terminal;
-    let curr_idx = cycle.indexOf(item);
-    let next_idx = curr_idx >= 0 ? (curr_idx + 1) % cycle.length : 0;
-    let next_item = cycle[next_idx];
-
-    node.cat = next_item;
-    let next_variants = CATEGORY_TO_VARIANT_NAMES[next_item];
-    for (var_name of TERMINAL_VARIANT_NAMES) {
-        node.variants[name] = next_variants.indexOf(var_name) > 0 ? node.variants[name] : "";
-    }
-    node.terminal = terminal_to_flat_terminal(node);
-
-    let new_dom_node = terminal_obj_to_dom_elem(node);
-    $(dom_node).replaceWith($(new_dom_node));
+    return old !== new_item ? node : false;
 }
 
 /*
@@ -563,12 +580,11 @@ function tree_to_dom_elem (obj) {
     return $(elem).first().get(0);
 }
 
-
 /*
    Extract whole dom syntax tree and convert it to a doubly linked plain tree object,
    return the current selected node
 */
-function get_path_to_root(elem) {
+function get_path_to_root_elem(elem) {
     let parent_elem = elem.parentElement;
     if (!parent_elem.dataset.nonterminal && !parent_elem.dataset.terminal) {
         return {
@@ -576,12 +592,12 @@ function get_path_to_root(elem) {
             path: []
         };
     }
-    let result = get_path_to_root(parent_elem);
-    result.path.push(get_child_index(elem));
+    let result = get_path_to_root_elem(parent_elem);
+    result.path.push(get_child_index_of_elem(elem));
     return result;
 }
 
-function get_child_index(elem) {
+function get_child_index_of_elem(elem) {
     return [...elem.parentNode.children].indexOf(elem);
 }
 
@@ -597,36 +613,26 @@ function traverse_path(node, path) {
    Extract whole dom syntax tree and convert it to a doubly linked plain tree object,
    return the current selected node
  */
-function get_rooted_selection () {
-    console.log("Getting rooted selection");
-    let sel_elem = startnode;
+function get_rooted_node_by_elem (sel_elem) {
+    // console.log("Getting rooted selection");
     if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
-        console.log("Unexpected dom object in dom_node_to_tree");
-        return;
+        console.log("Unexpected dom object in selected");
+        return false;
     }
 
-    let path_obj = get_path_to_root(sel_elem);
+    let path_obj = get_path_to_root_elem(sel_elem);
     let root_node = dom_node_to_tree(path_obj.root);
     let path = path_obj.path;
     let sel_node = traverse_path(root_node, path);
 
-    return sel_node;
-}
+    let rooted_node = {
+        path: path_obj.path,
+        root_elem: path_obj.root,
+        root_node: root_node,
+        node: sel_node
+    };
 
-function get_rooted_by_elem (elem) {
-    console.log("Getting rooted selection");
-    let sel_elem = startnode;
-    if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
-        console.log("Unexpected dom object in dom_node_to_tree");
-        return;
-    }
-
-    let path_obj = get_path_to_root(sel_elem);
-    let root_node = dom_node_to_tree(path_obj.root);
-    let path = path_obj.path;
-    let sel_node = traverse_path(root_node, path);
-
-    return sel_node;
+    return rooted_node;
 }
 
 /*
@@ -675,7 +681,8 @@ function dom_terminal_elem_to_obj(dom_node) {
     };
 }
 
-function delete_subvariant_by_name (node, var_name) {
+function delete_subvariant_by_name (var_name, sel) {
+    let node = sel.start.node;
     if (!node || !node.terminal) {
         return false;
     }
@@ -686,7 +693,8 @@ function delete_subvariant_by_name (node, var_name) {
     return node
 }
 
-function delete_subvariant_by_index (node, var_idx) {
+function delete_subvariant_by_index (var_idx, sel) {
+    let node = sel.start.node;
     if (!node || !node.terminal) {
         return false;
     }
@@ -696,63 +704,121 @@ function delete_subvariant_by_index (node, var_idx) {
     }
     let var_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
 
+    let old = node.variants[var_name];
+    let new_item = "";
     node.variants[var_name] = "";
     node.terminal = terminal_to_flat_terminal(node);
 
-    return node
+    return old !== new_item ? node : false;
 }
 
-function cycle_subvariant_by_variant_name (node, var_name) {
-    if (!VARIANT_NAME_TO_SUBVARIANTS[var_name]) {
-        console.log(`Unknown variant name '${var_name}'`);
-        return;
+function cycle_subvariant_by_variant_name (var_names, forward, sel) {
+    let node = sel.start.node;
+
+    let var_name = var_names;
+    console.log("var_names:", var_names);
+    console.log("cat_var_names:", CATEGORY_TO_VARIANT_NAMES[node.cat]);
+
+    if (Array.isArray(var_names)) {
+        var_name = var_names.filter((name) =>
+                                    CATEGORY_TO_VARIANT_NAMES[node.cat].includes(name));
+        var_name = var_name ? var_name[0] : false;
+    }
+    if (!var_name) {
+        console.log("skipping ", var_names, "for", node.cat)
+        return false;
     }
 
-    // let num_subvars = VARIANT_NAME_TO_SUBVARIANTS[var_name].length;
+    console.log("var_name:", var_name);
 
-    // let subvar_idx = VARIANT_NAME_TO_SUBVARIANTS[var_name].indexOf(node.variants[var_name]);
-    // let next_idx = subvar_idx >= 0 ? (subvar_idx + 1) % num_subvars : 0;
-
-    // node.variants[var_name] =  VARIANT_NAME_TO_SUBVARIANTS[var_name][next_idx];
-
-    node.variants[var_name] = array_cycle_next_elem(
+    let old = node.variants[var_name];
+    let new_item = array_cycle_next_elem(
         VARIANT_NAME_TO_SUBVARIANTS[var_name],
-        node.variants[var_name]
+        node.variants[var_name],
+        forward
     );
+    node.variants[var_name] = new_item
 
     node.terminal = terminal_to_flat_terminal(node);
 
-    return node
+    return old !== new_item ? node : false;
 }
 
-function cycle_subvariant_by_variant_index (node, var_idx) {
-    // let node = dom_terminal_elem_to_obj(dom_node);
+function cycle_subvariant_by_variant_index (var_idx, forward, sel) {
+    let node = sel.start.node;
     if (!node || !node.terminal) {
         return false;
     }
-    // debugger;
+
     if (var_idx < 0 || !CATEGORY_TO_VARIANT_NAMES[node.cat] || CATEGORY_TO_VARIANT_NAMES[node.cat].length <= var_idx) {
         console.log(`Illegal index '${var_idx}' on ${CATEGORY_TO_VARIANT_NAMES[node.cat]}`);
         return false;
     }
 
     let var_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
-    node.variants[var_name] = array_cycle_next_elem(
+    let old = node.variants[var_name];
+    let new_item = array_cycle_next_elem(
         VARIANT_NAME_TO_SUBVARIANTS[var_name],
-        node.variants[var_name]
+        node.variants[var_name],
+        forward
     );
-
-    // let variant_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
-    // let num_subvars = VARIANT_NAME_TO_SUBVARIANTS[variant_name].length;
-
-    // let subvar_idx = VARIANT_NAME_TO_SUBVARIANTS[variant_name].indexOf(node.variants[variant_name]);
-    // let next_idx = subvar_idx >= 0 ? (subvar_idx + 1) % num_subvars : 0;
-
-    // node.variants[variant_name] =  VARIANT_NAME_TO_SUBVARIANTS[variant_name][next_idx];
-
+    node.variants[var_name] = new_item;
     node.terminal = terminal_to_flat_terminal(node);
 
-    return node;
+    return old !== new_item ? node : false;
+}
+
+/*
+ * Insert phrasal node as parent of selected node
+ */
+function insert_nonterminal(sel) {
+    let node = sel.start.node;
+    let out_name = undefined;
+
+    if (node.terminal) {
+        out_name = TERMINAL_CAT_TO_NONTERMINAL[node.cat];
+    } else {
+        let cat = node.nonterminal.split("-")[0];
+        out_name = NONTERMINAL_CAT_TO_NONTERMINAL[cat];
+    }
+
+    let new_node = {
+        nonterminal: out_name,
+        children: [node],
+    };
+    let prev_parent = node.parent;
+    node.parent = new_node;
+
+    if (prev_parent) {
+        let child_idx = sel.start.path[sel.start.path.length - 1];
+        prev_parent.children[child_idx] = new_node;
+    }
+
+    return new_node;
+}
+
+/*
+ * Multiplex function by selection type
+ */
+function with_sel_singular(fn_map) {
+    function new_fn () {
+        let sel = get_selection();
+        if (sel.is_multi || !sel.start) {
+            return false;
+        }
+        let ret_fn = false;
+        if (sel.start.node.terminal && fn_map.terminal) {
+            ret_fn = fn_map.terminal;
+        } else if (sel.start.node.nonterminal && fn_map.nonterminal) {
+            ret_fn = fn_map.nonterminal;
+        }
+        if (!ret_fn) {
+            return false;
+        }
+        let new_args = [sel].concat([...arguments]);
+        return ret_fn.apply(null, new_args);
+    }
+    return new_fn;
 }
 
 /*
@@ -769,77 +835,43 @@ function apply_selection (fn) {
 /*
  * Lift a function over abstract tree objects to undoable dom operations
  */
-function mk_undoable_do_and_replace_with_fn(fn) {
-    function new_fn () {
-        // debugger;
-        let dom_node_in = get_selected_dom_terminal();
-        if (!dom_node_in) {
+function mk_undoable (effectful_fn) {
+    function new_fn (selection) {
+        let DEBUG = 0;
+        let new_args = [].concat([...arguments]);
+
+        DEBUG && console.log("new_args", new_args);
+
+
+        let is_changed = effectful_fn.apply(null, new_args);
+        DEBUG && console.log("is_changed", is_changed);
+
+        if (!is_changed) {
+            // undoAbortTransaction();
             return false;
         }
-        let DEBUG = 0;
-        let node_in = dom_node_to_tree(dom_node_in);
-        DEBUG && console.log(node_in);
-        let new_args = [node_in].concat([...arguments]);
-        let node_out = fn.apply(null, new_args);
-        DEBUG && console.log(node_in);
 
-        if (!node_out) {
-            // no changes
-            return;
-        }
+        let root_elem_in = selection.start.root_elem;
+        let root_elem_out = tree_to_dom_elem(selection.start.root_node);
+        root_elem_out.id = root_elem_in.id;
 
         // use legacy undo system defined in treedrawing.js
         undoBeginTransaction();
-        $(touchTree($(getTokenRoot($(dom_node_in)))));
-
-        DEBUG && console.log(dom_node_in);
-        let dom_node_out = tree_to_dom_elem(node_out);
-        DEBUG && console.log(dom_node_out);
-        // swap with dom
-        $(dom_node_in).replaceWith($(dom_node_out));
-        // set result as selected
-        $(dom_node_out).addClass("snodesel");
-
-        startnode = $(dom_node_out).first().get(0);
-
+        $(touchTree($(root_elem_in)));
+        $(root_elem_in).replaceWith($(root_elem_out));
         undoEndTransaction();
+
+        // TODO: walk to root from result instead
+        let effected_elem = traverse_path(root_elem_out, selection.start.path)
+
+        // TODO: loop over siblings when appropriate?
+        $(effected_elem).addClass("snodesel");
+        startnode = effected_elem;
+
+        return true;
     }
     return new_fn;
 }
-
-/*
- * Get selected terminal if selected region consists of a single terminal node
- */
-function get_selected_dom_terminal() {
-    if (!startnode) {
-        // No node selected
-        return false;
-    }
-    if (endnode) {
-        // Multiple nodes selected
-        return false;
-    }
-    if (startnode.dataset.nonterminal) {
-        return false;
-    }
-    return startnode;
-}
-
-function get_selection() {
-    console.log("get_selection: begin");
-    if (!startnode) {
-        console.log("get_selection: none");
-        return "single";
-    }
-    let start = dom_node_to_tree(startnode);
-    console.log("get_selection: start:", start.terminal ? "terminal" : "nonterminal");
-    if (endnode) {
-        console.log("get_selection:", "multi");
-        let end = dom_node_to_tree(endnode);
-        console.log("get_selection: end:", end.terminal ? "terminal" : "nonterminal");
-    }
-    console.log("\n");
-};
 
 let leaf_example_no = {
     text: "bílnum",
@@ -912,17 +944,6 @@ function insert_style_rule(rule) {
         var dom_np = $(".NP-SUBJ").first().get(0);
         var dom_s_ref = $(".S-REF").first().get(0);
 
-        // let rule =  `
-        // div.nonterminal-s {
-        //     background: #aa00aa;
-        //     border-left: 4px solid #aa0000;
-        // }`;
-        // insert_style_rule(rule);
-
-        /*
-          actions on terminals
-        */
-
         // cycle_subvariant_by_variant_index(dom_mirko, 1);
         // cycle_terminal_category(dom_mirko);
 
@@ -931,73 +952,149 @@ function insert_style_rule(rule) {
         */
         // cycle_nonterminal_category(dom_s_ref);
         // cycle_nonterminal_variant(dom_s_ref);
+
     }, 500);
 })();
 
+// Keybindings
 function customCommands() {
     // addCommand({ keycode: KEYS.A }, leafAfter );
-    // addCommand({ keycode: KEYS.B }, leafBefore);
-    // addCommand({ keycode: KEYS.E }, setLabel, ["CP-ADV","CP-CMP"]);
     addCommand({ keycode: KEYS.X }, makeNode, "XP");
-    // addCommand({ keycode: KEYS.X, shift: true }, setLabel, ["XP"]);
-    // addCommand({ keycode: KEYS.C }, coIndex);
     // addCommand({ keycode: KEYS.C, shift: true }, toggleCollapsed);
-    // addCommand({ keycode: KEYS.R }, setLabel, ["CP-REL","C$-FRL","CP-CAR",
-    //                                        "CP-CLF"]);
-    // addCommand({ keycode: KEYS.S }, setLabel, ["IP-SUB","IP-MAT","IP-IMP"]);
-    // addCommand({ keycode: KEYS.V }, setLabel, ["IP-SMC","IP-INF",
-    //                                        "IP-INF-PRP"]);
-    // addCommand({ keycode: KEYS.T }, setLabel, ["CP-THT","CP-THT-PRN","CP-DEG",
-    //                                        "CP-QUE"]);
-    // addCommand({ keycode: KEYS.G }, setLabel, ["ADJP","ADJP-SPR","NP-MSR",
-    //                                        "QP"]);
-    // addCommand({ keycode: KEYS.F }, setLabel, ["PP","ADVP","ADVP-TMP","ADVP-LOC",
-    //                                        "ADVP-DIR"]);
-
-    addCommand({ keycode: KEYS["1"] }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_name), "obj1");
-    addCommand({ keycode: KEYS["2"] }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_name), "obj2");
-    addCommand({ keycode: KEYS["1"], shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_name), "obj1");
-    addCommand({ keycode: KEYS["2"], shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_name), "obj2");
     // addCommand({ keycode: KEYS["2"], shift: true }, splitWord);
-    // addCommand({ keycode: KEYS["4"] }, toggleExtension, "PRN");
-    // addCommand({ keycode: KEYS["5"] }, toggleExtension, "SPE");
-    // addCommand({ keycode: KEYS.Q }, cycle_subvariant_by_variant_index, 1);
-    // addCommand({ keycode: KEYS.Q }, apply_selection(cycle_subvariant_by_variant_index), 1);
-    addCommand({ keycode: KEYS.Q, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 0);
-    addCommand({ keycode: KEYS.W, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 1);
-    addCommand({ keycode: KEYS.E, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 2);
-    addCommand({ keycode: KEYS.R, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 3);
-    addCommand({ keycode: KEYS.A, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 4);
-    addCommand({ keycode: KEYS.S, shift: true }, mk_undoable_do_and_replace_with_fn(delete_subvariant_by_index), 5);
 
-    addCommand({ keycode: KEYS.F}, get_rooted_selection);
+    // addCommand({ keycode: KEYS["1"]}, with_sel_singular({
+    //     // TODO: _op
+    //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    // }));
+    // addCommand({ keycode: KEYS["1"], shift: true}, with_sel_singular({
+    //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    // }));
+    // addCommand({ keycode: KEYS["2"]}, with_sel_singular({
+    //     // TODO: _subj_fall ?
+    //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    // }));
+    // addCommand({ keycode: KEYS["2"], shift: true}, with_sel_singular({
+    //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    // }));
 
-    addCommand({ keycode: KEYS.Q }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 0);
-    addCommand({ keycode: KEYS.W }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 1);
-    addCommand({ keycode: KEYS.E }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 2);
-    addCommand({ keycode: KEYS.R }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 3);
-    addCommand({ keycode: KEYS.A }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 4);
-    addCommand({ keycode: KEYS.S }, mk_undoable_do_and_replace_with_fn(cycle_subvariant_by_variant_index), 5);
+    addCommand({ keycode: KEYS.Q}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.Q, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.W}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.W, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.E}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.E, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.R}, with_sel_singular({
+        // TODO: sagnbot/lh_þt/lh_nt
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "mood", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.R, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "mood", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.T}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.T, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
 
-    addCommand({ keycode: KEYS.V }, mk_undoable_do_and_replace_with_fn(cycle_terminal_category));
+    addCommand({ keycode: KEYS.A}, with_sel_singular({
+        terminal: mk_undoable(insert_nonterminal),
+        nonterminal: mk_undoable(insert_nonterminal),
+    }));
 
-    addCommand({ keycode: KEYS.D }, pruneNode);
+    // addCommand({ keycode: KEYS.A}, with_sel_singular({
+    //     // TODO: bin_cycle
+    //     terminal: not_implemented_fn,
+    //     nonterminal: not_implemented_fn,
+    // }));
+
+    addCommand({ keycode: KEYS.S}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.S, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.D}, with_sel_singular({
+        // TODO: subj_case
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.D, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.F}, with_sel_singular({
+        // TODO: gender
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.F, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+
+    // addCommand({ keycode: KEYS.X}, with_sel_singular({
+    //     // TODO: context dependent
+    //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    // }));
+    addCommand({ keycode: KEYS.C}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.C, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+    addCommand({ keycode: KEYS.V}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    }));
+    addCommand({ keycode: KEYS.V, shift: true}, with_sel_singular({
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    }));
+
+
     addCommand({ keycode: KEYS.Z }, undo);
     addCommand({ keycode: KEYS.Z, shift: true}, redo);
     addCommand({ keycode: KEYS.L }, editNode);
     addCommand({ keycode: KEYS.SPACE }, clearSelection);
+
+    // addCommand({ keycode: KEYS.D }, pruneNode);
     // addCommand({ keycode: KEYS.GRAVE }, toggleLemmata);
     // addCommand({ keycode: KEYS.L, ctrl: true }, displayRename);
 
     addCommand({ keycode: KEYS.SOLIDUS }, search);
-
-
-    // TODO: remove this
-    // An example of a context-sensitive label switching command.  If
-    // neither NP or PP is the POS, the NP value (first in the dictionary)
-    // is chosen by default.
-    // addCommand({ keycode: 123 } , setLabel, { NP: ["NP-SBJ", "NP-OB1", "NP-OB2"],
-    //                                           PP: ["PP-SBJ", "PP-OB1", "PP-OB2"]});
 }
 
 
