@@ -331,6 +331,48 @@ const NONTERMINAL_CAT_TO_NONTERMINAL = {
     VP: "IP",
 };
 
+const SHORT_NP_CYCLE_1 = [
+    "NP",
+    "NP-SUBJ",
+    "NP-OBJ",
+    "NP-IOBJ",
+];
+
+const SHORT_NP_CYCLE_2 = [
+    "NP",
+    "NP-POSS",
+    "NP-PRD",
+    "NP-ADDRESS"
+];
+
+const SHORT_S_CYCLE_1 = [
+    "S",
+    "S-REF",
+    "S-THT"
+];
+
+const SHORT_S_CYCLE_2 = [
+    "S",
+    "S-MAIN",
+    "S-QUE",
+    "S-EXLAIN",
+];
+
+const SHORT_S_CYCLE_ALT_1 = [
+    "S-ADV-ACK",
+    "S-ADV-CAUSE",
+    "S-ADV-COND",
+    "S-ADV-CONS",
+    "S-ADV-PURP",
+    "S-ADV-TEMP",
+];
+
+// const SHORT_S_CYCLE_ALT_2 = [
+//     "S",
+//     "S-MAIN",
+//     "S-QUE",
+// ];
+
 /*
  * Get selected elems, convert to rooted trees
  */
@@ -430,13 +472,14 @@ function cycle_nonterminal_category (forward, sel) {
     let node = sel.start.node;
 
     let old = node.nonterminal;
-    let next_item = array_cycle_next_elem(
+    let nt_name = node.nonterminal.split("-")[0];
+    let new_item = array_cycle_next_elem(
         NONTERMINAL_CYCLE,
         nt_name,
         forward
     );
 
-    node.nonterminal = next_item;
+    node.nonterminal = new_item;
     return old !== new_item ? node : false;
 }
 
@@ -484,6 +527,30 @@ function cycle_terminal_category (forward, sel) {
     node.terminal = terminal_to_flat_terminal(node);
 
     return old !== new_item ? node : false;
+}
+
+function make_nonterminal_cycle_fn(arr, forward) {
+    function new_fn (sel) {
+        let node = sel.start.node;
+
+        let old = node.nonterminal;
+        let new_item = old;
+        if (arr.include(old)) {
+            new_item = array_cycle_next_elem(
+                arr,
+                old,
+                forward
+            );
+        } else {
+            new_item = arr[0];
+        }
+
+        node.nonterminal = new_item;
+
+        return old !== new_item ? node : false;
+    }
+
+    return new_fn
 }
 
 /*
@@ -543,13 +610,15 @@ function terminal_obj_to_dom_elem(obj) {
     });
     $(elem).append(text_elem);
     // TODO: make separate text right-adjusted box for lemma
-    if (obj.lemma) {
-        let lemma_elem = $("<span/>", {
-            class: "wnode",
-            text: obj.lemma
-        });
-        $(elem).append(lemma_elem);
-    }
+
+    // if (obj.lemma) {
+    //     let lemma_elem = $("<span/>", {
+    //         class: "wnode",
+    //         text: obj.lemma
+    //     });
+    //     $(elem).append(lemma_elem);
+    // }
+
     return $(elem).first().get(0);
 }
 
@@ -992,36 +1061,36 @@ function customCommands() {
     }));
     addCommand({ keycode: KEYS.W}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_1, FORWARD)),
     }));
     addCommand({ keycode: KEYS.W, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_1, BACKWARD)),
     }));
     addCommand({ keycode: KEYS.E}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.E, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.R}, with_sel_singular({
         // TODO: sagnbot/lh_þt/lh_nt
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "mood", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.R, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "mood", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.T}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_2, FORWARD)),
     }));
     addCommand({ keycode: KEYS.T, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_2, BACKWARD)),
     }));
 
     addCommand({ keycode: KEYS.A}, with_sel_singular({
@@ -1037,29 +1106,29 @@ function customCommands() {
 
     addCommand({ keycode: KEYS.S}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_1, FORWARD)),
     }));
     addCommand({ keycode: KEYS.S, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_1, BACKWARD)),
     }));
     addCommand({ keycode: KEYS.D}, with_sel_singular({
         // TODO: subj_case
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_2, FORWARD)),
     }));
     addCommand({ keycode: KEYS.D, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_2, BACKWARD)),
     }));
     addCommand({ keycode: KEYS.F}, with_sel_singular({
         // TODO: gender
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_category.bind(null, FORWARD)),
     }));
     addCommand({ keycode: KEYS.F, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterminal_category.bind(null, BACKWARD)),
     }));
 
     // addCommand({ keycode: KEYS.X}, with_sel_singular({
@@ -1069,19 +1138,19 @@ function customCommands() {
     // }));
     addCommand({ keycode: KEYS.C}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.C, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.V}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.V, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
 
 
