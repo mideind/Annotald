@@ -838,9 +838,11 @@ function cycle_subvariant_by_variant_index (var_idx, forward, sel) {
 }
 
 /*
- * Insert phrasal node as parent of selected node
+ * Insert phrasal node as parent of selected node/nodes
  */
 function insert_nonterminal(sel) {
+    console.log("inserting terminal");
+    // debugger;
     let node = sel.start.node;
     let out_name = undefined;
 
@@ -853,21 +855,56 @@ function insert_nonterminal(sel) {
 
     let new_node = {
         nonterminal: out_name,
-        children: [node],
+        children: [],
     };
     let prev_parent = node.parent;
-    node.parent = new_node;
 
     if (prev_parent) {
         let child_idx = sel.start.path[sel.start.path.length - 1];
+        let end_child_idx = sel.is_multi ? sel.end.path[sel.end.path.length - 1] : child_idx;
+        console.log(child_idx, end_child_idx);
+        for (let idx = end_child_idx; idx >= child_idx; idx--) {
+            let child = prev_parent.children[idx];
+            child.parent = new_node;
+            new_node.children.unshift(child);
+        }
         prev_parent.children[child_idx] = new_node;
     }
 
     return new_node;
 }
 
+// /*
+//  * Insert phrasal node as parent of selected node
+//  */
+// function prune_nonterminal(sel) {
+//     let node = sel.start.node;
+//     if (!node.nonterminal || !node.parent) {
+//         // cannot delete terminals or tree root
+//         return false;
+//     }
+//     let parent = node.parent;
+//     let child_idx = sel.start.path[sel.start.path.length - 1];
+//     let left_children = parent.children.filter((val, idx) => idx < child_idx);
+//     let right_children = parent.children.filter((val, idx) => idx > child_idx);
+//     let children = left_children.concat()
+//     // return new_node;
+// }
+
 /*
- * Multiplex function by selection type
+ * Bind current selection to function
+ */
+function with_sel(fn) {
+    function new_fn () {
+        let sel = get_selection();
+        let new_args = [sel].concat([...arguments]);
+        return fn.apply(null, new_args);
+    }
+    return new_fn;
+}
+
+/*
+ * Multiplex function by (singular) selection type
  */
 function with_sel_singular(fn_map) {
     function new_fn () {
@@ -906,7 +943,7 @@ function apply_selection (fn) {
  */
 function mk_undoable (effectful_fn) {
     function new_fn (selection) {
-        let DEBUG = 0;
+        let DEBUG = 1;
         let new_args = [].concat([...arguments]);
 
         DEBUG && console.log("new_args", new_args);
@@ -1093,10 +1130,7 @@ function customCommands() {
         nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_2, BACKWARD)),
     }));
 
-    addCommand({ keycode: KEYS.A}, with_sel_singular({
-        terminal: mk_undoable(insert_nonterminal),
-        nonterminal: mk_undoable(insert_nonterminal),
-    }));
+    addCommand({ keycode: KEYS.X}, with_sel(mk_undoable(insert_nonterminal)));
 
     // addCommand({ keycode: KEYS.A}, with_sel_singular({
     //     // TODO: bin_cycle
@@ -1131,11 +1165,6 @@ function customCommands() {
         nonterminal: mk_undoable(cycle_nonterminal_category.bind(null, BACKWARD)),
     }));
 
-    // addCommand({ keycode: KEYS.X}, with_sel_singular({
-    //     // TODO: context dependent
-    //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD)),
-    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
-    // }));
     addCommand({ keycode: KEYS.C}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", FORWARD)),
         nonterminal: not_implemented_fn,
@@ -1146,11 +1175,11 @@ function customCommands() {
     }));
     addCommand({ keycode: KEYS.V}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", FORWARD)),
-        nonterminal: not_implemented_fn,
+        nonterminal: with_sel_singular({nonterminal: pruneNode}),
     }));
     addCommand({ keycode: KEYS.V, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", BACKWARD)),
-        nonterminal: not_implemented_fn,
+        nonterminal: with_sel_singular({nonterminal: pruneNode}),
     }));
 
 
@@ -1159,7 +1188,6 @@ function customCommands() {
     addCommand({ keycode: KEYS.L }, editNode);
     addCommand({ keycode: KEYS.SPACE }, clearSelection);
 
-    // addCommand({ keycode: KEYS.D }, pruneNode);
     // addCommand({ keycode: KEYS.GRAVE }, toggleLemmata);
     // addCommand({ keycode: KEYS.L, ctrl: true }, displayRename);
 
