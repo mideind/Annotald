@@ -64,6 +64,7 @@ class AnnoTree(NLTKTree.Tree):
 
     @classmethod
     def to_html(cls, tree, version, extra_data=None):
+        print(tree)
         sisters = []
         real_root = None
         for daughter in tree:
@@ -89,8 +90,7 @@ class AnnoTree(NLTKTree.Tree):
             return cls.terminal_to_html(tree, version, extra_data=extra_data)
 
         # Regular nonterminal node
-        cssClass = re.sub("[-=][0-9]+$", "", tree.label())
-        classList = " ".join(["snode", cssClass])
+        # cssClass = re.sub("[-=][0-9]+$", "", tree.label())
 
         nonterminal = tree.label()
 
@@ -98,7 +98,7 @@ class AnnoTree(NLTKTree.Tree):
         nonterminal_class = "nonterminal-{0}".format(parts[0]).lower()
 
         attrib = {
-            "class": " ".join(["snode", cssClass, nonterminal_class]),
+            "class": " ".join(["snode", nonterminal_class]),
             "data-nonterminal": nonterminal,
         }
 
@@ -117,11 +117,10 @@ class AnnoTree(NLTKTree.Tree):
 
     @classmethod
     def terminal_to_html(cls, tree, version, extra_data=None):
-        if len(tree) > 1:
-            raise AnnotaldException(
-                "Leaf node with more than one " + "daughter!: %s" % str(tree)
-            )
-        cssClass = re.sub("[-=][0-9]+$", "", tree.label())
+        # if len(tree) > 1:
+        #     raise AnnotaldException(
+        #         "Leaf node with more than one " + "daughter!: %s" % str(tree)
+        #     )
 
         flat_terminal = tree.label()
         text_token = tree[0]
@@ -132,7 +131,7 @@ class AnnoTree(NLTKTree.Tree):
 
         attrib = {("data-" + key): value for (key, value) in parts.items()}
         attrib.update({
-            "class": " ".join(["snode", cssClass, terminal_class]),
+            "class": " ".join(["snode", terminal_class]),
             "data-text": text_token,
             "data-lemma": lemma,
             "data-terminal": flat_terminal,
