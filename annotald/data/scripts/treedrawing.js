@@ -82,6 +82,13 @@ var startnode = null;
  *
  * @type Node
  */
+
+const MOUSE = {
+    LEFT_BUTTON: 0,
+    MIDDLE_BUTTON: 1,
+    RIGHT_BUTTON: 2,
+}
+
 var endnode = null;
 var ctrlKeyMap = {};
 var shiftKeyMap = {};
@@ -356,8 +363,7 @@ function handleNodeClick(e) {
     e = e || window.event;
     var element = (e.target || e.srcElement);
     saveMetadata();
-    if (e.button == 2) {
-        // rightclick
+    if (e.button == MOUSE.RIGHT_BUTTON) {
         if (startnode && !endnode) {
             if (startnode != element) {
                 e.stopPropagation();
@@ -369,13 +375,13 @@ function handleNodeClick(e) {
             e.stopPropagation();
             moveNodes(element);
         } else {
+            selectNode(element, true);
             showContextMenu(e);
         }
-    } else {
-        // leftclick
+    } else if (e.button == MOUSE.LEFT_BUTTON) {
         hideContextMenu();
         if (e.shiftKey && startnode) {
-            selectNode(element, true);
+            selectNode(element);
             e.preventDefault(); // Otherwise, this sets the text
                                 // selection in the browser...
         } else {
@@ -384,6 +390,13 @@ function handleNodeClick(e) {
                 makeNode("XP");
             }
         }
+    } else if (e.button == MOUSE.MIDDLE_BUTTON) {
+        let sel = get_selection();
+        if (!sel) {
+            selectNode(element);
+            sel = get_selection();
+        }
+        console.log("mouse button3!");
     }
     _.each(clickHooks, function (fn) {
         fn(e.button);
@@ -402,6 +415,13 @@ function showContextMenu(e) {
         return;
     }
 
+    let sel = get_selection();
+    if (sel.start.node.nonterminal) {
+        populate_context_menu_nonterminal(sel);
+    } else {
+        populate_context_menu_terminal(sel);
+    }
+
     var left = e.pageX;
     var top = e.pageY;
     left = left + "px";
@@ -413,16 +433,12 @@ function showContextMenu(e) {
         conm = $("#conMenu");
 
     conl.empty();
-    loadContextMenu(element);
 
-    // Make the columns equally high
-    conl.height("auto");
-    conr.height("auto");
-    conrr.height("auto");
-    var h = _.max([conl,conr,conrr], function (x) { return x.height(); });
-    conl.height(h);
-    conr.height(h);
-    conrr.height(h);
+    // loadContextMenu(element);
+
+    $("#conMenu .conMenuColumn").each((idx) => { $(this).height("auto")});
+    let max_height = _.max($("#conMenu .conMenuColumn"), () => $(this).height());
+    $("#conMenu .conMenuColumn").each(() => $(this).height(max_height));
 
     conm.css("left",left);
     conm.css("top",top);

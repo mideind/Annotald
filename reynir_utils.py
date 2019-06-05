@@ -141,7 +141,30 @@ def simpleTree2NLTK(tt):
         # Punctuation
         return Tree(tt.text, [tt.text])
     # Terminal
-    return Tree(tt.terminal_with_all_variants, [tt.text])
+    seg_node, lemma_node = None, None
+
+    # lemma = tt.tidy_text if is_abbrev else tt.lemma
+
+    terminal_children = [tt.text]
+
+    is_abbrev = "." in tt.text and "." not in tt.lemma
+    is_segmented = "-" in tt.lemma and not "-" in tt.text
+    lemma_node = Tree("LEMMA", [tt.lemma])
+    seg_node = None
+    if is_abbrev:
+        lemma_node = Tree("LEMMA", [tt.text])
+        seg_node = Tree("LEMMA", [tt.lemma])
+    elif is_segmented:
+        lemma_node = Tree("LEMMA", ["".join(tt.lemma.split("-"))])
+        seg_node = Tree("EXP-SEG", [tt.lemma])
+
+    terminal_children.append(lemma_node)
+    if seg_node:
+        terminal_children.append(seg_node)
+
+
+    terminal = Tree(tt.terminal_with_all_variants, terminal_children)
+    return terminal
 
 
 def treemap(tree, nonterm_fn, term_fn):
@@ -425,13 +448,12 @@ def parse_text(
         yield nltk_tree
 
 
-def annotate_file(in_path, scheme=SCHEMES.ICEPAHC):
+def annotate_file(in_path, out_path, scheme=SCHEMES.ICEPAHC):
     print("Parsing file {0}".format(in_path))
-    out_path = in_path.with_suffix(".parse")
     print("Output file is {0}".format(out_path))
     with in_path.open(mode="r") as in_handle:
         text = in_handle.read()
-        with out_path.open(mode="w") as out_handle:
+        with Path(out_path).open(mode="w") as out_handle:
             for tree in parse_text(text, id_prefix=in_path.name, scheme=scheme):
                 formatted_trees = util._formatTree(tree)
                 out_handle.write(formatted_trees)
@@ -464,6 +486,14 @@ if __name__ == "__main__":
         help="Path to input file with contiguous text",
     )
     parser.add_argument(
+        "-o",
+        "--out_path",
+        dest="out_path",
+        required=True,
+        default="default",
+        help="Path to output file",
+    )
+    parser.add_argument(
         "-s",
         "--scheme",
         dest="scheme",
@@ -474,4 +504,4 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    annotate_file(args.in_path, scheme=args.scheme)
+    annotate_file(args.in_path, args.out_path, scheme=args.scheme)

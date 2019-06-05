@@ -196,18 +196,19 @@ function loadContextMenu(nodeOrig) {
         $("#conRight").append(newnode);
     }
 
-    $("#conRightest").empty();
-    $("#conRightest").append($("<div class='conMenuHeading'>Toggle ext.</div>"));
+    // $("#conRightest").empty();
+    // $("#conRightest").append($("<div class='conMenuHeading'>Toggle ext.</div>"));
 
-    // TODO: make only a subset of the extensions togglable, i.e. introduce a
-    // new variable togglableExtensions
-    for (i = 0; i < extensions.length; i++) {
-        // do the right side context menu
-        newnode = $("<div class='conMenuItem'><a href='#'>" +
-                        extensions[i] + "</a></div>");
-        $(newnode).mousedown(doToggleExtension(nodeOrig, extensions[i]));
-        $("#conRightest").append(newnode);
-    }
+    // // TODO: make only a subset of the extensions togglable, i.e. introduce a
+    // // new variable togglableExtensions
+    // for (i = 0; i < extensions.length; i++) {
+    //     // do the right side context menu
+    //     newnode = $("<div class='conMenuItem'><a href='#'>" +
+    //                     extensions[i] + "</a></div>");
+    //     $(newnode).mousedown(doToggleExtension(nodeOrig, extensions[i]));
+    //     $("#conRightest").append(newnode);
+    // }
+
 }
 
 /**

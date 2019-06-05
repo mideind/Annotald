@@ -609,6 +609,7 @@ function terminal_obj_to_dom_elem(obj) {
         text: obj.text
     });
     $(elem).append(text_elem);
+
     // TODO: make separate text right-adjusted box for lemma
 
     // if (obj.lemma) {
@@ -698,7 +699,8 @@ function get_rooted_node_by_elem (sel_elem) {
         path: path_obj.path,
         root_elem: path_obj.root,
         root_node: root_node,
-        node: sel_node
+        node: sel_node,
+        // elem: sel_elem,
     };
 
     return rooted_node;
@@ -939,6 +941,21 @@ function apply_selection (fn) {
 }
 
 /*
+ * Transform changed node in selection object to dom tree and swap undoably in dom
+ */
+function undoable_dom_swap(sel) {
+    let root_elem_in = sel.start.root_elem;
+    let root_elem_out = tree_to_dom_elem(sel.start.root_node);
+    root_elem_out.id = root_elem_in.id;
+    // use legacy undo system defined in treedrawing.js
+    undoBeginTransaction();
+    $(touchTree($(root_elem_in)));
+    $(root_elem_in).replaceWith($(root_elem_out));
+    undoEndTransaction();
+
+}
+
+/*
  * Lift a function over abstract tree objects to undoable dom operations
  */
 function mk_undoable (effectful_fn) {
@@ -1033,6 +1050,100 @@ let tree_example = {
     children: [leaf_example_no, leaf_example_so_1] // syntactically wrong, just for demo and debug purposes
 };
 
+function populate_context_menu_nonterminal(sel) {
+    let node = sel.start.node;
+    let cat = node.nonterminal.split("-")[0];
+    let names = [... NONTERMINAL_CYCLE];
+    console.log(NONTERMINAL_NAME_TO_CYCLE[cat])
+    let extensions = NONTERMINAL_NAME_TO_CYCLE[cat] || [];
+
+    function make_item(suggestion) {
+        let attrs = {
+            class: "conMenuItem",
+            "data-suggestion": suggestion,
+        };
+        let item = $("<div/>", attrs);
+        let text_elem = $("<a/>", {text: suggestion, href:"#"});
+        item.append(text_elem);
+        return item;
+    }
+
+    function handle_nonterminal_mouse_down(e) {
+        let ev = e || window.event;
+        let sug = ev.srcElement.dataset.suggestion || ev.srcElement.parentElement.dataset.suggestion;
+        sel.start.node.nonterminal = sug;
+        undoable_dom_swap(sel);
+        clearSelection();
+    }
+
+    let conmenu = $("#conMenu").empty();
+    let cat_col = $("<div/>", {class: "conMenuColumn"});
+    let ext_col = $("<div/>", {class: "conMenuColumn"});
+    ext_col.append($("<div/>", {class: "conMenuHeading", text: "Extensions"}));
+    cat_col.append($("<div/>", {class: "conMenuHeading", text: "Categories"}));
+
+    for (suggestion of names) {
+        cat_col.append(make_item(suggestion));
+    }
+    for (suggestion of extensions) {
+        ext_col.append(make_item(suggestion));
+    }
+    cat_col.mousedown(handle_nonterminal_mouse_down);
+    ext_col.mousedown(handle_nonterminal_mouse_down);
+
+    conmenu.append(cat_col);
+    conmenu.append(ext_col);
+}
+
+function populate_context_menu_terminal(sel) {
+    let node = sel.start.node;
+    let name = node.cat;
+    let curr_flat_term = node.terminal;
+    let names = [... TERMINAL_CYCLE];
+    /*
+      get root of tree
+      get id of tree at root
+      get index of leaf by inorder traversal
+      fetch bin candidates for terminal, BIN_CANDIDATES[tree_id][leaf_idx]
+      sort_by_prefix_length(candidates, curr_flat_term)
+      sort_by_lcs_length(candidates, curr_flat_term)
+
+      // names and candidates must become an html elem with a dataset tag
+     */
+    function make_item(suggestion) {
+        let attrs = {
+            class: "conMenuItem",
+            "data-suggestion": suggestion,
+        };
+        let item = $("<div/>", attrs);
+        let text_elem = $("<a/>", {text: suggestion, href:"#"});
+        item.append(text_elem);
+        return item;
+    }
+
+    function handle_terminal_mouse_down(e) {
+        let ev = e || window.event;
+        let sug = ev.srcElement.dataset.suggestion || ev.srcElement.parentElement.dataset.suggestion;
+        console.log(sug)
+        undoable_dom_swap(sel);
+        clearSelection();
+    }
+
+    let conmenu = $("#conMenu").empty();
+
+    let num_rows = 11;
+    let num_cols = Math.ceil(names.length/num_rows);
+    for (col_idx of _.range(num_cols)) {
+        let cat_col = $("<div/>", {class: "conMenuColumn"});
+        cat_col.append($("<div/>", {class: "conMenuHeading", text: "Categories"}));
+        for (suggestion of names.slice(col_idx * num_rows, (col_idx + 1) * num_rows)) {
+            cat_col.append(make_item(suggestion));
+        }
+        cat_col.mousedown(handle_terminal_mouse_down);
+        conmenu.append(cat_col);
+    }
+
+}
 
 function insert_style_rule(rule) {
     window.document.styleSheets[0].insertRule(rule);
@@ -1137,6 +1248,12 @@ function customCommands() {
     //     terminal: not_implemented_fn,
     //     nonterminal: not_implemented_fn,
     // }));
+
+    addCommand({ keycode: KEYS.A}, with_sel_singular({
+        // TODO: bin_cycle
+        terminal: not_implemented_fn,
+        nonterminal: populate_context_menu_nonterminal,
+    }));
 
     addCommand({ keycode: KEYS.S}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", FORWARD)),
