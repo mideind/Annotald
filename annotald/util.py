@@ -401,10 +401,8 @@ def _formatTree(tree, indent=0):
     # Should come from lovett
     if is_leaf(tree):
         # This is a leaf node
-        print("leaf", tree)
         return str(tree)
     else:
-        print("not_leaf", tree)
         label = tree.label() if isinstance(tree, AnnoTree) else str(tree) + "jo"
         s = "(%s " % (str(tree.label()))
         l = len(s)
