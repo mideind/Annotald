@@ -138,7 +138,7 @@ const NONTERMINAL_CYCLE = [
     "ADVP",
     "IP",
     "NP",
-    "P",
+    // "P",
     "PP",
     "S",
     "VP",
@@ -1300,7 +1300,8 @@ function customCommands() {
     }));
 
 
-    addCommand({ keycode: KEYS.Z }, undo);
+    // addCommand({ keycode: KEYS.Z }, undo);
+    addCommand({ keycode: KEYS.Z , ctrl: true}, undo);
     addCommand({ keycode: KEYS.Z, shift: true}, redo);
     addCommand({ keycode: KEYS.L }, editNode);
     addCommand({ keycode: KEYS.SPACE }, clearSelection);

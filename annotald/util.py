@@ -124,7 +124,21 @@ class AnnoTree(NLTKTree.Tree):
 
         flat_terminal = tree.label()
         text_token = tree[0]
-        lemma = text_token
+        lemma = None
+        seg_type = None
+        terminal_extra = [c.label() for c in tree if isinstance(c, AnnoTree)]
+
+        if "LEMMA" in terminal_extra:
+            idx = terminal_extra.index("LEMMA")
+            lemma = tree[idx + 1][0]
+        if "EXP-ABBREV" in terminal_extra:
+            idx = terminal_extra.index("EXP-ABBREV")
+            seg_type = "EXP-SEG"
+            seg_txt = tree[idx + 1][0]
+        elif "EXP-SEG" in terminal_extra:
+            idx = terminal_extra.index("EXP-SEG")
+            seg_type = "EXP-SEG"
+            seg_txt = tree[idx + 1][0]
 
         parts = split_flat_terminal(flat_terminal)
         terminal_class = "terminal-{0}".format(parts["cat"]).lower()
@@ -133,7 +147,7 @@ class AnnoTree(NLTKTree.Tree):
         attrib.update({
             "class": " ".join(["snode", terminal_class]),
             "data-text": text_token,
-            "data-lemma": lemma,
+            "data-lemma": lemma if lemma else "",
             "data-terminal": flat_terminal,
         })
 
@@ -146,8 +160,16 @@ class AnnoTree(NLTKTree.Tree):
         wnode = ET.SubElement(snode, "span", attrib={"class": "wnode"})
         wnode.text = text_token
 
-        # lemma_node = ET.SubElement(snode, "span", attrib={"class": "wnode"})
-        # lemma_node.text = lemma
+        # import pdb; pdb.set_trace()
+
+        if lemma:
+            lemma_node = ET.SubElement(snode, "span", attrib={"class": "wnode lemma-node"})
+            lemma_node.text = lemma
+
+        if seg_type:
+            seg_class = "exp-seg-node" if seg_type == "EXP-SEG" else "exp-abbrev-node"
+            seg_node = ET.SubElement(snode, "span", attrib={"class": " ".join(["wnode", seg_class])})
+            seg_node.text = seg_txt
 
         return snode
 
