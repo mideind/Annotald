@@ -393,17 +393,19 @@ def writeTreesToFile(meta, trees, filename, reformat=False, fix_indices=False):
 
 
 def is_leaf(tree):
-    # return len(tree) == 1 and isinstance(tree[0], str)
-    return isinstance(tree[0], str)
+    # return (len(tree) == 1 and isinstance(tree[0], str)) or isinstance(tree, str)
+    return isinstance(tree[0], str) or isinstance(tree, str)
 
 
 def _formatTree(tree, indent=0):
     # Should come from lovett
     if is_leaf(tree):
         # This is a leaf node
-        import pdb; pdb.set_trace()
-        return "(%s %s)" % (str(tree.label()), str(tree[0]))
+        print("leaf", tree)
+        return str(tree)
     else:
+        print("not_leaf", tree)
+        label = tree.label() if isinstance(tree, AnnoTree) else str(tree) + "jo"
         s = "(%s " % (str(tree.label()))
         l = len(s)
         leaves = ("\n" + " " * (indent + l)).join(

@@ -153,7 +153,7 @@ def simpleTree2NLTK(tt):
     seg_node = None
     if is_abbrev:
         lemma_node = Tree("LEMMA", [tt.text])
-        seg_node = Tree("LEMMA", [tt.lemma])
+        seg_node = Tree("EXP-ABBREV", [tt.lemma])
     elif is_segmented:
         lemma_node = Tree("LEMMA", ["".join(tt.lemma.split("-"))])
         seg_node = Tree("EXP-SEG", [tt.lemma])
@@ -161,7 +161,6 @@ def simpleTree2NLTK(tt):
     terminal_children.append(lemma_node)
     if seg_node:
         terminal_children.append(seg_node)
-
 
     terminal = Tree(tt.terminal_with_all_variants, terminal_children)
     return terminal
