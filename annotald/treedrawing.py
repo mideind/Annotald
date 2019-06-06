@@ -46,6 +46,8 @@ from annotald import util
 
 VERSION = annotald.__version__
 
+HTML_LPAREN = "&#40;"
+HTML_RPAREN = "&#41;"
 
 class Treedraw(object):
     def __init__(self, args, shortfile):
@@ -302,8 +304,9 @@ class Treedraw(object):
             tree = tree.strip()
             tree = tree.replace("<", "&lt;")
             tree = tree.replace(">", "&gt;")
+            tree = tree.replace(r"\(", HTML_LPAREN)
+            tree = tree.replace(r"\)", HTML_RPAREN)
             if not tree == "":
-                # nltk_tree = nltk.tree.Tree.fromstring(tree)
                 nltk_tree = AnnoTree.fromstring(tree)
                 alltrees = alltrees + self.conversionFn(nltk_tree, version)
 

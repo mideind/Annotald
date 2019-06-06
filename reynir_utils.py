@@ -129,6 +129,8 @@ _GREYNIR_ICEPACH_NT_MAP = {
     "IP": "IP",
 }
 
+def escape_parens(text):
+    return text.replace("(", r"\(").replace(")", r"\)")
 
 def simpleTree2NLTK(tt):
     """ Convert Reynir SimpleTree to NLTK Tree
@@ -136,27 +138,27 @@ def simpleTree2NLTK(tt):
     if tt._len > 1 or tt._children:
         # Children present: Array or nonterminal
         return Tree(tt.tag, [simpleTree2NLTK(child) for child in tt.children])
+    escaped_text = escape_parens(tt.text)
+    escaped_lemma = escape_parens(tt.lemma)
     # No children
     if tt._head.get("k") == "PUNCTUATION":
         # Punctuation
-        return Tree(tt.text, [tt.text])
+        return Tree("grm", [escaped_text])
     # Terminal
     seg_node, lemma_node = None, None
 
-    # lemma = tt.tidy_text if is_abbrev else tt.lemma
-
-    terminal_children = [tt.text]
+    terminal_children = [escaped_text]
 
     is_abbrev = "." in tt.text and "." not in tt.lemma
     is_segmented = "-" in tt.lemma and not "-" in tt.text
-    lemma_node = Tree("LEMMA", [tt.lemma])
+    lemma_node = Tree("LEMMA", [escaped_lemma])
     seg_node = None
     if is_abbrev:
-        lemma_node = Tree("LEMMA", [tt.text])
-        seg_node = Tree("EXP-ABBREV", [tt.lemma])
+        lemma_node = Tree("LEMMA", [escaped_lemma])
+        seg_node = Tree("EXP-ABBREV", [escaped_lemma])
     elif is_segmented:
-        lemma_node = Tree("LEMMA", ["".join(tt.lemma.split("-"))])
-        seg_node = Tree("EXP-SEG", [tt.lemma])
+        lemma_node = Tree("LEMMA", ["".join(escaped_lemma.split("-"))])
+        seg_node = Tree("EXP-SEG", [escaped_lemma])
 
     terminal_children.append(lemma_node)
     if seg_node:
@@ -385,7 +387,7 @@ def tok_stream_to_null_icepahc(tok_stream):
 
 def tok_stream_to_null_reynir(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
-    root = Tree("P", [Tree("S-MAIN", [Tree("X", [str(tok)]) for tok in tok_stream])])
+    root = Tree("P", [Tree("S-MAIN", [Tree("X", [escape_parens(str(tok))]) for tok in tok_stream])])
     return root
 
 

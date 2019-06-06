@@ -41,7 +41,7 @@ from pprint import pprint
 from xml.etree import ElementTree as ET
 
 # External libraries
-import nltk.tree as NLTKTree
+import nltk.tree
 
 CASES = {"nf", "þf", "þgf", "ef"}
 GENDERS = {"kk", "kvk", "hk"}
@@ -54,17 +54,27 @@ MOOD = {"fh", "lh", "lh", "vh", "bh"}
 MISC = {"sagnb", "subj", "abbrev", "op", "none"}
 
 
+HTML_LPAREN = "&#40;"
+HTML_RPAREN = "&#41;"
+
+def html_escape_parens(text):
+    return text.replace(r"\(", HTML_LPAREN).replace("\)", HTML_RPAREN)
+
+
+def html_unescape_parens(text):
+    return text.replace(HTML_LPAREN, r"\(").replace(HTML_RPAREN, "\)")
+
+
 class AnnotaldException(Exception):
     pass
 
 
-class AnnoTree(NLTKTree.Tree):
+class AnnoTree(nltk.tree.Tree):
     def __init__(self, *args, **kwargs):
         super(AnnoTree, self).__init__(*args, **kwargs)
 
     @classmethod
     def to_html(cls, tree, version, extra_data=None):
-        print(tree)
         sisters = []
         real_root = None
         for daughter in tree:
@@ -73,7 +83,7 @@ class AnnoTree(NLTKTree.Tree):
                 sisters.append(daughter)
             else:
                 if real_root:
-                    print(real_root)
+                    print("real_root", real_root)
                     raise AnnotaldException(
                         "root tree has too many/unknown daughters!: %s" % str(tree)
                     )
@@ -81,16 +91,24 @@ class AnnoTree(NLTKTree.Tree):
                     real_root = daughter
         xtra_data = sisters
         snode = cls.to_html_inner(real_root, version, extra_data=xtra_data)
-        return ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
+        result = ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
+        result = html_escape_parens(result)
+        return result
+
+    @classmethod
+    def is_terminal(cls, tree):
+        return isinstance(tree, AnnoTree) and tree.label().islower()
+
+    @classmethod
+    def leaf_text(cls, tree):
+        token_text = " ".join([child for child in tree if isinstance(child, str)])
+        token_text = html_unescape_parens(token_text)
+        return token_text
 
     @classmethod
     def to_html_inner(cls, tree, version, extra_data=None):
-        if isinstance(tree[0], str):
-            # Leaf node
+        if cls.is_terminal(tree):
             return cls.terminal_to_html(tree, version, extra_data=extra_data)
-
-        # Regular nonterminal node
-        # cssClass = re.sub("[-=][0-9]+$", "", tree.label())
 
         nonterminal = tree.label()
 
@@ -103,13 +121,10 @@ class AnnoTree(NLTKTree.Tree):
         }
 
         # if extra_data:
-            # E.g. [AnnoTree('ID', ['setningar.txt,.1'])]
+        # E.g. [AnnoTree('ID', ['setningar.txt,.1'])]
         #     attrib["data-metadata"] = safe_json(nodeListToDict(extra_data))
 
-        snode = ET.Element(
-            "div",
-            attrib=attrib
-        )
+        snode = ET.Element("div", attrib=attrib)
         snode.text = nonterminal
         snode.extend(list(cls.to_html_inner(x, version) for x in tree))
 
@@ -117,58 +132,53 @@ class AnnoTree(NLTKTree.Tree):
 
     @classmethod
     def terminal_to_html(cls, tree, version, extra_data=None):
-        # if len(tree) > 1:
-        #     raise AnnotaldException(
-        #         "Leaf node with more than one " + "daughter!: %s" % str(tree)
-        #     )
-
         flat_terminal = tree.label()
-        text_token = tree[0]
+        token_text = cls.leaf_text(tree)
         lemma = None
         seg_type = None
-        terminal_extra = [c.label() for c in tree if isinstance(c, AnnoTree)]
+        terminal_extra = {
+            child.label(): tree for child in tree if isinstance(child, AnnoTree)
+        }
 
         if "LEMMA" in terminal_extra:
-            idx = terminal_extra.index("LEMMA")
-            lemma = tree[idx + 1][0]
+            lemma = cls.leaf_text(terminal_extra["LEMMA"])
         if "EXP-ABBREV" in terminal_extra:
-            idx = terminal_extra.index("EXP-ABBREV")
+            seg_txt = cls.leaf_text(terminal_extra["EXP-ABBREV"])
             seg_type = "EXP-SEG"
-            seg_txt = tree[idx + 1][0]
         elif "EXP-SEG" in terminal_extra:
-            idx = terminal_extra.index("EXP-SEG")
+            seg_txt = cls.leaf_text(terminal_extra["EXP-SEG"])
             seg_type = "EXP-SEG"
-            seg_txt = tree[idx + 1][0]
 
         parts = split_flat_terminal(flat_terminal)
         terminal_class = "terminal-{0}".format(parts["cat"]).lower()
 
         attrib = {("data-" + key): value for (key, value) in parts.items()}
-        attrib.update({
-            "class": " ".join(["snode", terminal_class]),
-            "data-text": text_token,
-            "data-lemma": lemma if lemma else "",
-            "data-terminal": flat_terminal,
-        })
-
-        snode = ET.Element(
-            "div",
-            attrib=attrib
+        attrib.update(
+            {
+                "class": " ".join(["snode", terminal_class]),
+                "data-text": token_text,
+                "data-lemma": lemma if lemma else "",
+                "data-terminal": flat_terminal,
+            }
         )
+
+        snode = ET.Element("div", attrib=attrib)
         snode.text = flat_terminal
 
         wnode = ET.SubElement(snode, "span", attrib={"class": "wnode"})
-        wnode.text = text_token
-
-        # import pdb; pdb.set_trace()
+        wnode.text = token_text
 
         if lemma:
-            lemma_node = ET.SubElement(snode, "span", attrib={"class": "wnode lemma-node"})
+            lemma_node = ET.SubElement(
+                snode, "span", attrib={"class": "wnode lemma-node"}
+            )
             lemma_node.text = lemma
 
         if seg_type:
             seg_class = "exp-seg-node" if seg_type == "EXP-SEG" else "exp-abbrev-node"
-            seg_node = ET.SubElement(snode, "span", attrib={"class": " ".join(["wnode", seg_class])})
+            seg_node = ET.SubElement(
+                snode, "span", attrib={"class": " ".join(["wnode", seg_class])}
+            )
             seg_node.text = seg_txt
 
         return snode

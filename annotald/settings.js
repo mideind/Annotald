@@ -25,27 +25,6 @@
 var logDetail = true;
 
 /*
- * Displays a context menu for setting case extensions according to
- * the IcePaHC annotation scheme.
- *
- * caseTags indicates which tags bear case indicators; casePhrases indicates
- * which phrasal categories case pertains to (though they themselves are not
- * marked)
- */
-var displayCaseMenu = true;
-var caseTags = ["N","NS","NPR","NPRS",
-                "PRO","D","NUM",
-                "ADJ","ADJR","ADJS",
-                "Q","QR","QS"];
-var casePhrases = ["NP","QP","ADJP"];
-var caseMarkers = ["N", "A", "D", "G"];
-
-/*
- * Which labels are barriers to recursive case assignment.
- */
-var caseBarriers = ["IP","CP","NP"];
-
-/*
  * These two functions should return true if the string argument is a valid
  * label for a branching (-Phrase-) and non-branching (-Leaf-) label, and
  * false otherwise.  The utility function basesAndDashes is provided.  It
@@ -57,31 +36,6 @@ var caseBarriers = ["IP","CP","NP"];
  */
 var testValidPhraseLabel = undefined;
 var testValidLeafLabel   = undefined;
-
-/*
- * Extensions are treated as not part of the label for various purposes, they
- * are all binary, and they show up in the toggle extension menu.  There are 3
- * classes of extensions: those that apply to leaf nodes, those that apply to
- * clausal nodes (IP and CP), and those that apply to non-leaf, non-clause
- * nodes.
- */
-var extensions        = ["SBJ","RSP","LFD","PRN","SPE","XXX"];
-var clause_extensions = ["RSP","LFD","SBJ","PRN","SPE","XXX"];
-var leaf_extensions   = [];
-
-/*
- * Phrase labels in this list (including the same ones with indices and
- * extensions) get a different background color so that the annotator can
- * see the "floor" of the current clause
- */
-var ipnodes = ["IP-SUB","IP-MAT","IP-IMP","IP-INF","IP-PPL","RRC"];
-
-// Types of comments.
-// Comments are nodes of the form (CODE {XXX:words_words_words})
-// If "XXX" is in the following list, then when editing the contents of the
-// comment with one of the editing functions (TODO: list), a dialog box will
-// appear allowing the comment to be edited as text.
-var commentTypes = ["COM", "TODO", "MAN"];
 
 function not_implemented_fn () {
     console.log("Not implemented yet");
@@ -700,7 +654,6 @@ function get_rooted_node_by_elem (sel_elem) {
         root_elem: path_obj.root,
         root_node: root_node,
         node: sel_node,
-        // elem: sel_elem,
     };
 
     return rooted_node;
