@@ -135,7 +135,8 @@ class AnnoTree(nltk.tree.Tree):
         flat_terminal = tree.label()
         token_text = cls.leaf_text(tree)
         lemma = None
-        seg_type = None
+        seg = None
+        exp_attrib = None
         terminal_extra = {
             child.label(): tree for child in tree if isinstance(child, AnnoTree)
         }
@@ -143,11 +144,21 @@ class AnnoTree(nltk.tree.Tree):
         if "LEMMA" in terminal_extra:
             lemma = cls.leaf_text(terminal_extra["LEMMA"])
         if "EXP-ABBREV" in terminal_extra:
-            seg_txt = cls.leaf_text(terminal_extra["EXP-ABBREV"])
-            seg_type = "EXP-SEG"
+            seg = {
+                "type": "EXP-ABBREV",
+                "text": cls.leaf_text(terminal_extra["EXP-ABBREV"]),
+            }
+            exp_attrib = {
+                "data-abbrev": seg["text"]
+            }
         elif "EXP-SEG" in terminal_extra:
-            seg_txt = cls.leaf_text(terminal_extra["EXP-SEG"])
-            seg_type = "EXP-SEG"
+            seg = {
+                "type": "EXP-SEG",
+                "text": cls.leaf_text(terminal_extra["EXP-SEG"]),
+            }
+            exp_attrib = {
+                "data-seg": seg["text"]
+            }
 
         parts = split_flat_terminal(flat_terminal)
         terminal_class = "terminal-{0}".format(parts["cat"]).lower()
@@ -158,9 +169,13 @@ class AnnoTree(nltk.tree.Tree):
                 "class": " ".join(["snode", terminal_class]),
                 "data-text": token_text,
                 "data-lemma": lemma if lemma else "",
+                "data-seg": "",
+                "data-abbrev": "",
                 "data-terminal": flat_terminal,
             }
         )
+        if exp_attrib is not None:
+            attrib.update(exp_attrib)
 
         snode = ET.Element("div", attrib=attrib)
         snode.text = flat_terminal
@@ -174,12 +189,12 @@ class AnnoTree(nltk.tree.Tree):
             )
             lemma_node.text = lemma
 
-        if seg_type:
-            seg_class = "exp-seg-node" if seg_type == "EXP-SEG" else "exp-abbrev-node"
+        if seg:
+            seg_class = "exp-seg-node" if seg["type"] == "EXP-SEG" else "exp-abbrev-node"
             seg_node = ET.SubElement(
                 snode, "span", attrib={"class": " ".join(["wnode", seg_class])}
             )
-            seg_node.text = seg_txt
+            seg_node.text = seg["text"]
 
         return snode
 

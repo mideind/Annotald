@@ -554,9 +554,11 @@ function terminal_obj_to_dom_elem(obj) {
         attrs["data-" + name] = obj.variants[name];
     }
     attrs["data-cat"] = obj.cat;
-    attrs["data-lemma"] = obj.lemma;
+    attrs["data-lemma"] = obj.lemma || "";
     attrs["data-text"] = obj.text;
     attrs["data-terminal"] = obj.terminal;
+    attrs["data-seg"] = obj.seg || "";
+    attrs["data-abbrev"] = obj.abbrev || "";
     let elem = $("<div/>", attrs);
     let text_elem = $("<span/>", {
         class: "wnode",
@@ -564,15 +566,24 @@ function terminal_obj_to_dom_elem(obj) {
     });
     $(elem).append(text_elem);
 
-    // TODO: make separate text right-adjusted box for lemma
+    // lemma
+    if (obj.lemma) {
+        let lemma_elem = $("<span/>", {
+            class: ["wnode", "lemma-node"].join(" "),
+            text: obj.lemma
+        });
+        $(elem).append(lemma_elem);
+    }
 
-    // if (obj.lemma) {
-    //     let lemma_elem = $("<span/>", {
-    //         class: "wnode",
-    //         text: obj.lemma
-    //     });
-    //     $(elem).append(lemma_elem);
-    // }
+    // expansion
+    if (obj.seg || obj.abbrev) {
+        exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node"
+        let exp_elem = $("<span/>", {
+            class: ["wnode", exp_class].join(" "),
+            text: obj.seg || obj.abbrev
+        });
+        $(elem).append(exp_elem);
+    }
 
     return $(elem).first().get(0);
 }
@@ -696,13 +707,17 @@ function dom_terminal_elem_to_obj(dom_node) {
     for (name of TERMINAL_VARIANT_NAMES) {
         variants[name] = dom_node.dataset[name];
     }
-    return {
+    let term_obj = {
         text: dom_node.dataset.text,
         lemma: dom_node.dataset.lemma,
         cat: dom_node.dataset.cat,
         terminal: dom_node.dataset.terminal,
+        abbrev: dom_node.dataset.abbrev,
+        seg: dom_node.dataset.seg,
         variants: variants
     };
+    console.log(term_obj);
+    return term_obj;
 }
 
 function delete_subvariant_by_name (var_name, sel) {

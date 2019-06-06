@@ -363,9 +363,8 @@ body {
 /* Greynir nonterminal styling */
 
 div.nonterminal-s {
-    background: #f0dd8e;
-    border-left: 4px solid #cc8b2c;
-    #f0dd8
+    background: #f2ac7c;
+    border-left: 4px solid #b57b3c;
 }
 
 .nonterminal-adjp {
@@ -380,12 +379,11 @@ div.nonterminal-s {
 }
 
 div.nonterminal-ip {
-    background: #f0dd8e;
-    border-left: 4px solid #cc8b2c;
+    background: #f0dd9b;
+    border-left: 4px solid #bc9f3c;
 }
 
 .nonterminal-np {
-    /* background: #337-ab7; */
     background: #93bae7;
     border-left: 4px solid #115895;
 }
@@ -396,17 +394,21 @@ div.nonterminal-ip {
 }
 
 .nonterminal-pp {
-    background: #aaa0aa;
-    border-left: 4px solid #443944;
+    background: #ac96cb;
+    border-left: 4px solid #935093;
 }
 
 .nonterminal-vp {
-    /* background: #d95-34f; */
     background: #ffa19d;
     border-left: 4px solid #b7312d;
 }
 
 /* Greynir terminal styling */
+
+.terminal-fs {
+    background: #e3b0e3;
+    border-left: 4px solid #834083;
+}
 
 .terminal-x {
     background: #FFFFFF;
@@ -481,11 +483,6 @@ div.nonterminal-ip {
 .terminal-dags {
     background: #FFFFFF;
     border-left: 4px solid #FF0000;
-}
-
-.terminal-fs {
-    background: #cccccc;
-    border-left: 4px solid #443944;
 }
 
 .terminal-fyrirtæki {
