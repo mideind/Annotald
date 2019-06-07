@@ -632,8 +632,14 @@ function get_path_to_root_elem(elem) {
     return result;
 }
 
+function arr_contains(arr_like, item) {
+    return [... arr_like].includes(item);
+}
+
 function get_child_index_of_elem(elem) {
-    return [...elem.parentNode.children].indexOf(elem);
+    return [... elem.parentNode.children].filter(
+        (child) => !arr_contains(child.classList, "tree-id-node")
+    ).indexOf(elem);
 }
 
 function traverse_path(node, path) {
@@ -645,11 +651,10 @@ function traverse_path(node, path) {
 }
 
 /*
-   Extract whole dom syntax tree and convert it to a doubly linked plain tree object,
+   Extract whole tree that contains sel_elem and convert it to a doubly linked plain tree object,
    return the current selected node
  */
 function get_rooted_node_by_elem (sel_elem) {
-    // console.log("Getting rooted selection");
     if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
         console.log("Unexpected dom object in selected");
         return false;
@@ -680,10 +685,14 @@ function dom_node_to_tree (elem) {
     }
 
     function dom_nonterminal_elem_to_obj(elem) {
-        return {
+        let nt = {
             nonterminal: elem.dataset.nonterminal,
             children: []
         };
+        if (elem.dataset.tree_id) {
+            nt.tree_id = elem.dataset.tree_id;
+        }
+        return nt
     }
 
     if (elem.dataset.terminal) {
@@ -692,6 +701,9 @@ function dom_node_to_tree (elem) {
 
     let nt_node = dom_nonterminal_elem_to_obj(elem);
     for (let child_elem of elem.children) {
+        if ([...child_elem.classList].includes("tree-id-node")) {
+            continue;
+        }
         let child_node = dom_node_to_tree(child_elem)
         child_node.parent = nt_node;
         nt_node.children.push(child_node);
@@ -716,7 +728,6 @@ function dom_terminal_elem_to_obj(dom_node) {
         seg: dom_node.dataset.seg,
         variants: variants
     };
-    console.log(term_obj);
     return term_obj;
 }
 
@@ -812,7 +823,6 @@ function cycle_subvariant_by_variant_index (var_idx, forward, sel) {
  */
 function insert_nonterminal(sel) {
     console.log("inserting terminal");
-    // debugger;
     let node = sel.start.node;
     let out_name = undefined;
 

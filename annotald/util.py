@@ -74,28 +74,6 @@ class AnnoTree(nltk.tree.Tree):
         super(AnnoTree, self).__init__(*args, **kwargs)
 
     @classmethod
-    def to_html(cls, tree, version, extra_data=None):
-        sisters = []
-        real_root = None
-        for daughter in tree:
-            if daughter.label() == "ID" or daughter.label() == "METADATA":
-                # TODO(AWE): conditional is non-portable
-                sisters.append(daughter)
-            else:
-                if real_root:
-                    print("real_root", real_root)
-                    raise AnnotaldException(
-                        "root tree has too many/unknown daughters!: %s" % str(tree)
-                    )
-                else:
-                    real_root = daughter
-        xtra_data = sisters
-        snode = cls.to_html_inner(real_root, version, extra_data=xtra_data)
-        result = ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
-        result = html_escape_parens(result)
-        return result
-
-    @classmethod
     def is_terminal(cls, tree):
         return isinstance(tree, AnnoTree) and tree.label().islower()
 
@@ -106,9 +84,32 @@ class AnnoTree(nltk.tree.Tree):
         return token_text
 
     @classmethod
-    def to_html_inner(cls, tree, version, extra_data=None):
+    def to_html(cls, tree, version, extra_data=None):
+        top_level_nodes = {child.label(): child for child in tree}
+
+        id_node = top_level_nodes.pop("ID", None)
+
+        real_root = next(iter(top_level_nodes.values()))
+        snode = cls.to_html_inner(real_root)
+
+        if id_node:
+            id_str = cls.leaf_text(id_node)
+            id_node = ET.Element("span", text=id_str, attrib={
+                "class": " ".join(["wnode", "tree-id-node"]),
+            })
+            id_node.text = id_str
+            snode.insert(0, id_node)
+            snode.attrib["data-tree_id"] = id_str
+
+        result = ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
+        result = html_escape_parens(result)
+
+        return result
+
+    @classmethod
+    def to_html_inner(cls, tree):
         if cls.is_terminal(tree):
-            return cls.terminal_to_html(tree, version, extra_data=extra_data)
+            return cls.terminal_to_html(tree)
 
         nonterminal = tree.label()
 
@@ -120,18 +121,14 @@ class AnnoTree(nltk.tree.Tree):
             "data-nonterminal": nonterminal,
         }
 
-        # if extra_data:
-        # E.g. [AnnoTree('ID', ['setningar.txt,.1'])]
-        #     attrib["data-metadata"] = safe_json(nodeListToDict(extra_data))
-
         snode = ET.Element("div", attrib=attrib)
         snode.text = nonterminal
-        snode.extend(list(cls.to_html_inner(x, version) for x in tree))
+        snode.extend(list(cls.to_html_inner(x) for x in tree))
 
         return snode
 
     @classmethod
-    def terminal_to_html(cls, tree, version, extra_data=None):
+    def terminal_to_html(cls, tree):
         flat_terminal = tree.label()
         token_text = cls.leaf_text(tree)
         lemma = None

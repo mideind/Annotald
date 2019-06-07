@@ -397,7 +397,7 @@ def insert_id(tree, prefix, index):
              (ID {prefix},.{index}))
     """
     id_str = "{prefix},.{index}".format(prefix=prefix, index=index)
-    tree.insert(len(tree) + 1, Tree("ID", [id_str]))
+    tree.insert(0, Tree("ID", [id_str]))
 
 
 def reynir_sentence_to_icepahc(sent):
