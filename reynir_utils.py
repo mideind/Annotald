@@ -30,6 +30,7 @@ import os
 from pathlib import Path
 
 from nltk import Tree
+from annotald.util import AnnoTree
 
 try:
     from reynir import Reynir
@@ -137,13 +138,14 @@ def simpleTree2NLTK(tt):
         without changing labels """
     if tt._len > 1 or tt._children:
         # Children present: Array or nonterminal
-        return Tree(tt.tag, [simpleTree2NLTK(child) for child in tt.children])
+        # return (tt.tag, [simpleTree2NLTK(child) for child in tt.children])
+        return AnnoTree(tt.tag, [simpleTree2NLTK(child) for child in tt.children])
     escaped_text = escape_parens(tt.text)
     escaped_lemma = escape_parens(tt.lemma)
     # No children
     if tt._head.get("k") == "PUNCTUATION":
         # Punctuation
-        return Tree("grm", [escaped_text])
+        return AnnoTree("grm", [escaped_text])
     # Terminal
     seg_node, lemma_node = None, None
 
@@ -151,20 +153,20 @@ def simpleTree2NLTK(tt):
 
     is_abbrev = "." in tt.text and "." not in tt.lemma
     is_segmented = "-" in tt.lemma and not "-" in tt.text
-    lemma_node = Tree("LEMMA", [escaped_lemma])
+    lemma_node = AnnoTree("lemma", [escaped_lemma])
     seg_node = None
     if is_abbrev:
-        lemma_node = Tree("LEMMA", [escaped_lemma])
-        seg_node = Tree("EXP-ABBREV", [escaped_lemma])
+        lemma_node = AnnoTree("lemma", [escaped_text])
+        seg_node = AnnoTree("exp_abbrev", [escaped_lemma])
     elif is_segmented:
-        lemma_node = Tree("LEMMA", ["".join(escaped_lemma.split("-"))])
-        seg_node = Tree("EXP-SEG", [escaped_lemma])
+        lemma_node = AnnoTree("lemma", ["".join(escaped_lemma.split("-"))])
+        seg_node = AnnoTree("exp_seg", [escaped_lemma])
 
     terminal_children.append(lemma_node)
     if seg_node:
         terminal_children.append(seg_node)
 
-    terminal = Tree(tt.terminal_with_all_variants, terminal_children)
+    terminal = AnnoTree(tt.terminal_with_all_variants, terminal_children)
     return terminal
 
 
@@ -173,18 +175,18 @@ def treemap(tree, nonterm_fn, term_fn):
         return a new transformed tree"""
     if util.is_leaf(tree):
         # terminal node
-        return Tree(term_fn(tree.label()), [tree[0]])
+        return AnnoTree(term_fn(tree.label()), [tree[0]])
     else:
         # nonterminal node
         label = nonterm_fn(tree.label())
         children = [treemap(subtree, nonterm_fn, term_fn) for subtree in tree]
-        return Tree(label, children)
+        return AnnoTree(label, children)
 
 
 def reynir_tree_to_icepach(simple_tree, affix_lemma=1):
     """ Outer function for _reynir_tree_to_icepach """
     nltk_tree = _reynir_tree_to_icepach(simple_tree, affix_lemma=affix_lemma)
-    return Tree("", nltk_tree)
+    return AnnoTree("", nltk_tree)
 
 
 def _reynir_tree_to_icepach(tree, affix_lemma=1):
@@ -195,7 +197,7 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
         xp = _GREYNIR_ICEPACH_NT_MAP.get(xp, xp)
         children = []
         for child in [_reynir_tree_to_icepach(child) for child in tree.children]:
-            if isinstance(child, Tree):
+            if isinstance(child, AnnoTree):
                 children.append(child)
             else:
                 children.extend(child)
@@ -224,14 +226,14 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
                 ext_children.append(child)
 
         else:
-            node = Tree(xp, ext_children)
+            node = AnnoTree(xp, ext_children)
             return [node]
 
     # No children
     if tree._head.get("k") == "PUNCTUATION":
         # Punctuation
         lemma_suffix = "" if not affix_lemma else "-" + tree.text
-        return Tree(tree.text, [tree.text + lemma_suffix])
+        return AnnoTree(tree.text, [tree.text + lemma_suffix])
 
     extra_leaves = []
     leaf_tag = tree.tcat
@@ -275,7 +277,7 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
         )
         if "gr" in tree.all_variants:
             lemma_suffix = "" if not affix_lemma else "-hinn"
-            det_leaf = Tree("D" + leaf_case_suffix, ["$" + lemma_suffix])
+            det_leaf = AnnoTree("D" + leaf_case_suffix, ["$" + lemma_suffix])
             extra_leaves.append(det_leaf)
 
     elif leaf_tag == "lo":
@@ -376,18 +378,18 @@ def _reynir_tree_to_icepach(tree, affix_lemma=1):
 
     # print("{:>25s}{:>40s}".format(tree.text, tree.terminal_with_all_variants))
     lemma_suffix = "" if not affix_lemma else "-{0}".format(tree.lemma.lower())
-    leaf = Tree(leaf_tag, ["{0}{1}".format(tree.text, lemma_suffix)])
+    leaf = AnnoTree(leaf_tag, ["{0}{1}".format(tree.text, lemma_suffix)])
     return [leaf] + extra_leaves
 
 
 def tok_stream_to_null_icepahc(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
-    root = Tree("", [Tree("IP-MAT", [Tree("X", [str(tok)]) for tok in tok_stream])])
+    root = AnnoTree("", [AnnoTree("IP-MAT", [AnnoTree("X", [str(tok)]) for tok in tok_stream])])
     return root
 
 def tok_stream_to_null_reynir(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
-    root = Tree("P", [Tree("S-MAIN", [Tree("X", [escape_parens(str(tok))]) for tok in tok_stream])])
+    root = AnnoTree("P", [AnnoTree("S-MAIN", [AnnoTree("X", [escape_parens(str(tok))]) for tok in tok_stream])])
     return root
 
 
@@ -397,7 +399,7 @@ def insert_id(tree, prefix, index):
              (ID {prefix},.{index}))
     """
     id_str = "{prefix},.{index}".format(prefix=prefix, index=index)
-    tree.insert(0, Tree("ID", [id_str]))
+    tree.insert(0, AnnoTree("ID", [id_str]))
 
 
 def reynir_sentence_to_icepahc(sent):
@@ -414,7 +416,7 @@ def reynir_sentence_to_reynir(sent):
         nltk_tree = simpleTree2NLTK(sent.tree)
     else:
         nltk_tree = tok_stream_to_null_reynir([tok.txt for tok in sent._s if tok])
-    return Tree("", [ nltk_tree ])
+    return AnnoTree("", [ nltk_tree ])
 
 def parse_single(
     text, affix_lemma=1, id_prefix=None, start_index=1, scheme=SCHEMES.ICEPAHC

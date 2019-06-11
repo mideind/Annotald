@@ -41,6 +41,12 @@ import cherrypy.lib.caching
 from mako.template import Template
 from annotald.util import AnnoTree
 
+try:
+    from icecream import ic
+    ic.configureOutput(includeContext=True)
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
 # Local libraries
 from annotald import util
 
@@ -117,45 +123,107 @@ class Treedraw(object):
             self.trees = trees
         return "\n\n".join(self.trees)
 
+    # def doSave(self, trees=None, startTime=None, force=None, update_md5=None):
+    # def doSave(self, trees=None):
     @cherrypy.expose
+    @cherrypy.tools.json_in()
     @cherrypy.tools.json_out()
-    def doSave(self, trees=None, startTime=None, force=None, update_md5=None):
-        # Save failure reason codes
-        NON_MATCHING_ANNOTALDS = 1
-        NON_MATCHING_HASHES = 2
+    def doSave(self, data=None):
+        data = data or cherrypy.request.json
+        # ic(data)
+        trees = data["trees"]
 
         cherrypy.response.headers["Content-Type"] = "application/json"
-        if (startTime != self.startTime) and not (force == "true"):
-            return dict(
-                result="failure",
-                reason="non-matching invocations of Annotald",  # noqa
-                reasonCode=NON_MATCHING_ANNOTALDS,
-                startTime=self.startTime,
-            )
-        tosave = self.integrateTrees(trees)
-        tosave = tosave.replace("-FLAG", "")
-        print("self.thefile is: %s" % self.thefile)
-        if update_md5:
-            self.versionCookie = util.updateVersionCookie(
-                self.versionCookie,
-                "HASH.MD5",
-                util.hashTrees(trees, self.versionCookie),
-            )
-        if util.queryVersionCookie(self.versionCookie, "HASH.MD5"):
-            print("checking hash")
-            # TODO: document hash function in user manual
-            old_hash = util.queryVersionCookie(self.versionCookie, "HASH.MD5")
-            new_hash = util.hashTrees(tosave, self.versionCookie)
-            if old_hash != new_hash:
-                return dict(
-                    result="failure",
-                    reason=("corpus text has changed" + " (it shouldn't!)"),
-                    reasonCode=NON_MATCHING_HASHES,
-                    startTime=self.startTime,
+
+        def convert_js_tree(tree_dict):
+            if "tree_id" in tree_dict:
+                # root node and nonterminal
+                id_node = AnnoTree("ID", [tree_dict["tree_id"]])
+                nt_node = AnnoTree(
+                    tree_dict["nonterminal"],
+                    [convert_js_tree(child) for child in tree_dict["children"]]
                 )
-        tosave = tosave.replace("-FLAG", "")
+                # pseudo_root
+                node = AnnoTree("", [id_node, nt_node])
+            elif "nonterminal" in tree_dict:
+                # non-root nonterminal or no id
+                node = AnnoTree(
+                    tree_dict["nonterminal"],
+                    [convert_js_tree(child) for child in tree_dict["children"]]
+                )
+            elif "terminal" in tree_dict:
+                flat_terminal = tree_dict["terminal"]
+                text = util.escape_parens(tree_dict["text"])
+                children = [text]
+
+                if "lemma" in tree_dict and tree_dict["lemma"]:
+                    escaped_lemma = util.escape_parens(tree_dict["lemma"])
+                    children.append(AnnoTree("lemma", [escaped_lemma]))
+                if "seg" in tree_dict and tree_dict["seg"]:
+                    escaped_seg = util.escape_parens(tree_dict["lemma"])
+                    children.append(AnnoTree("exp_seg", [escaped_seg]))
+                elif "abbrev" in tree_dict and tree_dict["abbrev"]:
+                    escaped_abbrev = util.escape_parens(tree_dict["lemma"])
+                    children.append(AnnoTree("exp_abbrev", [escaped_abbrev]))
+
+                node = AnnoTree(flat_terminal, children)
+                return node
+            return node
+
+        # ic(trees[0])
+        trees = [convert_js_tree(tree) for tree in trees]
+        # ic(trees[0].pretty())
+        output_str = "\n\n".join([tree.pretty() for tree in trees])
+
+        # print(output_str)
+
+        # startTime = data["trees"]
+        # force = data["force"]
+        # update_md5 = data["update_md5"]
+
+        # # # Save failure reason codes
+        # NON_MATCHING_ANNOTALDS = 1
+        # NON_MATCHING_HASHES = 2
+
+
+        # if (startTime != self.startTime) and not (force == "true"):
+        #     return dict(
+        #         result="failure",
+        #         reason="non-matching invocations of Annotald",  # noqa
+        #         reasonCode=NON_MATCHING_ANNOTALDS,
+        #         startTime=self.startTime,
+        #     )
+
+        # tosave = self.integrateTrees(trees)
+        # tosave = tosave.replace("-FLAG", "")
+
+        # print("self.thefile is: %s" % self.thefile)
+
+        # if update_md5:
+        #     self.versionCookie = util.updateVersionCookie(
+        #         self.versionCookie,
+        #         "HASH.MD5",
+        #         util.hashTrees(trees, self.versionCookie),
+        #     )
+
+        # if util.queryVersionCookie(self.versionCookie, "HASH.MD5"):
+        #     print("checking hash")
+        #     # TODO: document hash function in user manual
+        #     old_hash = util.queryVersionCookie(self.versionCookie, "HASH.MD5")
+        #     new_hash = util.hashTrees(tosave, self.versionCookie)
+        #     if old_hash != new_hash:
+        #         return dict(
+        #             result="failure",
+        #             reason=("corpus text has changed" + " (it shouldn't!)"),
+        #             reasonCode=NON_MATCHING_HASHES,
+        #             startTime=self.startTime,
+        #         )
+
+        # tosave = tosave.replace("-FLAG", "")
+
         try:
-            util.writeTreesToFile(self.versionCookie, tosave, self.thefile)
+            # util.writeTreesToFile(self.versionCookie, tosave, self.thefile)
+            util.writeTreesToFile(self.versionCookie, output_str, self.thefile)
             self.doLogEvent({"type": "save"})
             return dict(result="success")
         except Exception as e:

@@ -162,13 +162,14 @@ function assignEvents() {
 }
 
 function styleIpNodes() {
-    if (typeof ipnodes !== "undefined") {
-        for (var i = 0; i < ipnodes.length; i++) {
-            styleTag(ipnodes[i], "border-top: 1px solid black;" +
-                     "border-bottom: 1px solid black;" +
-                     "background-color: #C5908E;");
-        }
-    }
+    console.log("styling ip nodes");
+    // if (typeof ipnodes !== "undefined") {
+    //     for (var i = 0; i < ipnodes.length; i++) {
+    //         styleTag(ipnodes[i], "border-top: 1px solid black;" +
+    //                  "border-bottom: 1px solid black;" +
+    //                  "background-color: #C5908E;");
+    //     }
+    // }
 }
 
 function addStartupHook(fn) {
@@ -179,7 +180,6 @@ function documentReadyHandler() {
     // TODO: something is very slow here; profile
     // TODO: move some of this into hooks
     assignEvents();
-    styleIpNodes();
     setupCommentTypes();
     globalStyle.appendTo("head");
 
@@ -210,11 +210,11 @@ function addStyle(string) {
  * the given tag with additional trailing dash tags.
  * @param {String} css The css style declarations to associate with the tag.
  */
-function styleTag(tagName, css) {
-    addStyle('*[class*=" ' + tagName + '-"],*[class*=" ' + tagName +
-             ' "],*[class$=" ' + tagName + '"],[class*=" ' + tagName +
-             '="] { ' + css + ' }');
-}
+// function styleTag(tagName, css) {
+//     addStyle('*[class*=" ' + tagName + '-"],*[class*=" ' + tagName +
+//              ' "],*[class$=" ' + tagName + '"],[class*=" ' + tagName +
+//              '="] { ' + css + ' }');
+// }
 
 /**
  * Add a css style for a certain dash tag.
@@ -223,11 +223,11 @@ function styleTag(tagName, css) {
  * this dash tag.  Should not itself have leading or trailing dashes.
  * @param {String} css The css style declarations to associate with the tag.
  */
-function styleDashTag(tagName, css) {
-    addStyle('*[class*="-' + tagName + '-"],*[class*="-' + tagName +
-             ' "],*[class$="-' + tagName + '"],[class*="-' + tagName +
-             '="] { ' + css + ' }');
-}
+// function styleDashTag(tagName, css) {
+//     addStyle('*[class*="-' + tagName + '-"],*[class*="-' + tagName +
+//              ' "],*[class$="-' + tagName + '"],[class*="-' + tagName +
+//              '="] { ' + css + ' }');
+// }
 
 /**
  * A convenience function to wrap {@link styleTag}.
@@ -235,11 +235,11 @@ function styleDashTag(tagName, css) {
  * @param {Array} tagNames Tags to style.
  * @param {String} css The css style declarations to associate with the tags.
  */
-function styleTags(tagNames, css) {
-    for (var i = 0; i < tagNames.length; i++) {
-        styleTag(tagNames[i], css);
-    }
-}
+// function styleTags(tagNames, css) {
+//     for (var i = 0; i < tagNames.length; i++) {
+//         styleTag(tagNames[i], css);
+//     }
+// }
 
 // ========== Key bindings
 
@@ -2307,35 +2307,93 @@ function saveHandler (data) {
     saveInProgress = false;
 }
 
-function save(e, extraArgs) {
-    if (!extraArgs) {
-        extraArgs = {};
-    }
-    if (document.getElementById("leafphrasebox") ||
-        document.getElementById("labelbox")) {
-        // It should be impossible to trigger a save in these conditions, but
-        // it causes data corruption if the save happens,, so this functions
-        // as a last-ditch safety.
-        displayError("Cannot save while editing a node label.");
-        return;
-    }
+// function logEvent(type, data) {
+//     data = data || {};
+//     data.type = type;
+//     payload = { eventData: data };
+//     $.ajax({
+//         url: "/doLogEvent",
+//         async: true,
+//         dataType: "json",
+//         type: "POST",
+//         data: JSON.stringify(payload),
+//         contentType : "application/json",
+//         traditional: true
+//     });
+// }
+
+function save(e) {
+    let trees = get_all_trees();
+    let data = {trees: trees};
+    console.log(trees);
     if (!saveInProgress) {
         displayInfo("Saving...");
         saveInProgress = true;
         setTimeout(function () {
-            var tosave = toLabeledBrackets($("#editpane"));
-            extraArgs.trees = tosave;
-            extraArgs.startTime = startTime;
-            $.post("/doSave", extraArgs, saveHandler).error(function () {
-                lastsavedstate = "";
-                saveInProgress = false;
-                displayError("Save failed, could not " +
-                             "communicate with server!");
+            $.ajax({
+                type: "POST",
+                contentType : "application/json",
+                dataType: "json",
+                url: "/doSave",
+                async: true,
+                traditional: true,
+                data: JSON.stringify(data),
+                success: function (args) {
+                    console.log("sucess", args);
+                    displayInfo("Save complete");
+                },
+                error: function (args) {
+                    displayInfo("Error occurred during saving");
+                },
+                complete: function (args) {
+                    saveInProgress = false;
+                }
             });
-            unAutoIdle();
-            lastsavedstate = $("#editpane").html();
         }, 0);
     }
+}
+
+function old_save(e) {
+    console.log("old_save");
+    // let data = {};
+    // if (document.getElementById("leafphrasebox") ||
+    //     document.getElementById("labelbox")) {
+    //     // It should be impossible to trigger a save in these conditions, but
+    //     // it causes data corruption if the save happens,, so this functions
+    //     // as a last-ditch safety.
+    //     displayError("Cannot save while editing a node label.");
+    //     return;
+    // }
+    // if (!saveInProgress) {
+    //     displayInfo("Saving...");
+    //     saveInProgress = true;
+    //     setTimeout(function () {
+    //         debugger;
+    //         // var tosave = toLabeledBrackets($("#editpane"));
+    //         // extraArgs.trees = tosave;
+    //         data.trees = get_all_trees();
+    //         // debugger;
+    //         data.startTime = startTime;
+    //         $.ajax({
+    //             type: "POST",
+    //             url: "/doSave",
+    //             data: data,
+    //             success: function (args) {
+    //                 console.log("sucess", args);
+    //                 saveInProgress = false;
+    //             },
+    //             dataType: "json",
+    //         });
+    //         // $.post("/doSave", data, saveHandler).error(function () {
+    //         //     lastsavedstate = "";
+    //         //     saveInProgress = false;
+    //         //     displayError("Save failed, could not " +
+    //         //                  "communicate with server!");
+    //         // });
+    //         // unAutoIdle();
+    //         // lastsavedstate = $("#editpane").html();
+    //     }, 100);
+    // }
 }
 
 // ========== Validating

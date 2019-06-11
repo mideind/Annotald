@@ -609,6 +609,13 @@ function tree_to_dom_elem (obj) {
     attrs["data-nonterminal"] = obj.nonterminal;
     let elem = $("<div/>", attrs);
 
+    if (obj.hasOwnProperty("tree_id")) {
+        let tree_id_elem = $("<span/>", {
+            class: (["wnode", "tree-id-node"]).join(" "),
+            text: obj.tree_id,
+        });
+        $(elem).append(tree_id_elem);
+    }
     for (child of obj.children) {
         $(elem).append(tree_to_dom_elem(child));
     }
@@ -651,8 +658,8 @@ function traverse_path(node, path) {
 }
 
 /*
-   Extract whole tree that contains sel_elem and convert it to a doubly linked plain tree object,
-   return the current selected node
+ * Extract whole tree that contains sel_elem and convert it to a doubly linked plain tree object,
+ * return the current selected node
  */
 function get_rooted_node_by_elem (sel_elem) {
     if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
@@ -1025,14 +1032,19 @@ let leaf_example_so_2 = {
 
 let tree_example = {
     nonterminal: "NP-SUBJ",
-    children: [leaf_example_no, leaf_example_so_1] // syntactically wrong, just for demo and debug purposes
+    children: [leaf_example_no]
+};
+
+let root_example = {
+    nonterminal: "S0",
+    tree_id: "tree_example.psd,.1",
+    children: [tree_example]
 };
 
 function populate_context_menu_nonterminal(sel) {
     let node = sel.start.node;
     let cat = node.nonterminal.split("-")[0];
     let names = [... NONTERMINAL_CYCLE];
-    console.log(NONTERMINAL_NAME_TO_CYCLE[cat])
     let extensions = NONTERMINAL_NAME_TO_CYCLE[cat] || [];
 
     function make_item(suggestion) {
@@ -1123,21 +1135,58 @@ function populate_context_menu_terminal(sel) {
 
 }
 
+/*
+ * Remove backpointer to parent nodes in tree
+ */
+function doubly_linked_tree_to_singly_linked(tree) {
+    delete tree["parent"];
+    tree.children && tree.children.map(doubly_linked_tree_to_singly_linked);
+    return tree;
+}
+
+/*
+ * Remove empty or undefined attributes in all nodes in tree
+ */
+function remove_undefined_or_empty_attr(tree) {
+    let properties = []
+    for (let property in tree) {
+        if (tree.hasOwnProperty(property)) {
+            properties.push(property);
+        }
+    }
+    for (let prop of properties) {
+        if (tree[prop] === undefined || tree[prop] === "") {
+            delete tree[prop];
+        }
+    }
+    if (tree.variants) {
+        remove_undefined_or_empty_attr(tree.variants);
+    }
+    tree.children && tree.children.map(remove_undefined_or_empty_attr);
+    return tree;
+}
+
+function get_all_trees() {
+    let trees = [];
+    for (child of document.getElementById("sn0").children) {
+        trees.push(dom_node_to_tree(child));
+    }
+    return trees.map(doubly_linked_tree_to_singly_linked).map(remove_undefined_or_empty_attr);
+}
+
 function insert_style_rule(rule) {
     window.document.styleSheets[0].insertRule(rule);
 }
-// function addStyle(string) {
-//     var style = globalStyle.text() + "\n" + string;
-//     globalStyle.text(style);
-// }
 
 // run on start up, dev purposes
 (() => {
     window.setTimeout(() => {
 
-        var dom_mirko = $(".no_et_nf_hk").first().get(0);
-        var dom_np = $(".NP-SUBJ").first().get(0);
-        var dom_s_ref = $(".S-REF").first().get(0);
+        // var dom_mirko = $(".no_et_nf_hk").first().get(0);
+        // var dom_np = $(".NP-SUBJ").first().get(0);
+        // var dom_s_ref = $(".S-REF").first().get(0);
+
+        let trees = get_all_trees();
 
         // cycle_subvariant_by_variant_index(dom_mirko, 1);
         // cycle_terminal_category(dom_mirko);
@@ -1342,4 +1391,4 @@ function customConLeafBefore() {
 // styleTag function, styleDashTag takes as an argument the name of a dash tag
 // and CSS rule(s) to apply to it.
 
-styleDashTag("FLAG", "color: red");
+// styleDashTag("FLAG", "color: red");

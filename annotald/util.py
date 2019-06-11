@@ -57,12 +57,21 @@ MISC = {"sagnb", "subj", "abbrev", "op", "none"}
 HTML_LPAREN = "&#40;"
 HTML_RPAREN = "&#41;"
 
-def html_escape_parens(text):
+
+def escaped_parens_to_html_parens(text):
     return text.replace(r"\(", HTML_LPAREN).replace("\)", HTML_RPAREN)
 
 
-def html_unescape_parens(text):
+def html_parens_to_escaped_parens(text):
     return text.replace(HTML_LPAREN, r"\(").replace(HTML_RPAREN, "\)")
+
+
+def html_parens_to_parens(text):
+    return text.replace(HTML_LPAREN, "(").replace(HTML_RPAREN, ")")
+
+
+def escape_parens(text):
+    return text.replace("(", r"\(").replace(")", r"\)")
 
 
 class AnnotaldException(Exception):
@@ -74,13 +83,17 @@ class AnnoTree(nltk.tree.Tree):
         super(AnnoTree, self).__init__(*args, **kwargs)
 
     @classmethod
+    def fromstring(cls, tree_str):
+        transliterated = escaped_parens_to_html_parens(tree_str)
+        return super(AnnoTree, cls).fromstring(transliterated)
+
+    @classmethod
     def is_terminal(cls, tree):
         return isinstance(tree, AnnoTree) and tree.label().islower()
 
     @classmethod
     def leaf_text(cls, tree):
         token_text = " ".join([child for child in tree if isinstance(child, str)])
-        token_text = html_unescape_parens(token_text)
         return token_text
 
     @classmethod
@@ -94,15 +107,16 @@ class AnnoTree(nltk.tree.Tree):
 
         if id_node:
             id_str = cls.leaf_text(id_node)
-            id_node = ET.Element("span", text=id_str, attrib={
-                "class": " ".join(["wnode", "tree-id-node"]),
-            })
+            id_node = ET.Element(
+                "span",
+                text=id_str,
+                attrib={"class": " ".join(["wnode", "tree-id-node"])},
+            )
             id_node.text = id_str
             snode.insert(0, id_node)
             snode.attrib["data-tree_id"] = id_str
 
         result = ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
-        result = html_escape_parens(result)
 
         return result
 
@@ -135,30 +149,26 @@ class AnnoTree(nltk.tree.Tree):
         seg = None
         exp_attrib = None
         terminal_extra = {
-            child.label(): tree for child in tree if isinstance(child, AnnoTree)
+            child.label(): child for child in tree if isinstance(child, AnnoTree)
         }
 
-        if "LEMMA" in terminal_extra:
-            lemma = cls.leaf_text(terminal_extra["LEMMA"])
-        if "EXP-ABBREV" in terminal_extra:
+        if "lemma" in terminal_extra:
+            lemma = cls.leaf_text(terminal_extra["lemma"])
+        if "exp_abbrev" in terminal_extra:
             seg = {
-                "type": "EXP-ABBREV",
-                "text": cls.leaf_text(terminal_extra["EXP-ABBREV"]),
+                "type": "exp_abbrev",
+                "text": cls.leaf_text(terminal_extra["exp_abbrev"]),
             }
-            exp_attrib = {
-                "data-abbrev": seg["text"]
-            }
-        elif "EXP-SEG" in terminal_extra:
-            seg = {
-                "type": "EXP-SEG",
-                "text": cls.leaf_text(terminal_extra["EXP-SEG"]),
-            }
-            exp_attrib = {
-                "data-seg": seg["text"]
-            }
+            exp_attrib = {"data-abbrev": seg["text"]}
+        elif "exp_seg" in terminal_extra:
+            seg = {"type": "exp_seg", "text": cls.leaf_text(terminal_extra["exp_seg"])}
+            exp_attrib = {"data-seg": seg["text"]}
 
         parts = split_flat_terminal(flat_terminal)
         terminal_class = "terminal-{0}".format(parts["cat"]).lower()
+
+        lemma = html_parens_to_parens(lemma) if lemma else lemma
+        token_text = html_parens_to_parens(token_text)
 
         attrib = {("data-" + key): value for (key, value) in parts.items()}
         attrib.update(
@@ -187,13 +197,19 @@ class AnnoTree(nltk.tree.Tree):
             lemma_node.text = lemma
 
         if seg:
-            seg_class = "exp-seg-node" if seg["type"] == "EXP-SEG" else "exp-abbrev-node"
+            seg_class = (
+                "exp-seg-node" if seg["type"] == "exp_seg" else "exp-abbrev-node"
+            )
             seg_node = ET.SubElement(
                 snode, "span", attrib={"class": " ".join(["wnode", seg_class])}
             )
             seg_node.text = seg["text"]
 
         return snode
+
+    def pretty(self):
+        ret = html_parens_to_escaped_parens(_formatTree(self))
+        return ret
 
 
 def split_flat_terminal(term_tok):
@@ -270,7 +286,7 @@ def safe_json(dict):
 def queryVersionCookie(treestr, key):
     if treestr == "" or not treestr:
         return None
-    t = AnnoTree.Tree.fromstring(treestr)[0]
+    t = AnnoTree.fromstring(treestr)[0]
     if t.label() != "VERSION":
         return
     return _queryVersionCookieInner(t, key)
@@ -293,7 +309,7 @@ def _queryVersionCookieInner(tree, key):
 def updateVersionCookie(treestr, key, val):
     if treestr == "" or not treestr:
         return None
-    tree = AnnoTree.Tree.fromstring(treestr)
+    tree = AnnoTree.fromstring(treestr)
     tree = tree[0]
     if tree.label() != "VERSION":
         return
@@ -312,7 +328,7 @@ def updateVersionCookie(treestr, key, val):
 
     ret = dictToMetadata(dd)
     ret.set_label("VERSION")
-    return str(AnnoTree.Tree("", [ret]))
+    return str(AnnoTree("", [ret]))
 
 
 def labelFromLabelAndMetadata(label, metadata):
@@ -340,7 +356,7 @@ def orthoFromTree(tree):
 
 
 def nodeListToDict(nodes):
-    return metadataToDict(AnnoTree.Tree("FOO", nodes))
+    return metadataToDict(AnnoTree("FOO", nodes))
 
 
 def metadataToDict(metadata):
@@ -348,7 +364,7 @@ def metadataToDict(metadata):
     # defaultdict
     d = defaultdict(f)
     for datum in metadata:
-        if isinstance(datum[0], AnnoTree.Tree):
+        if isinstance(datum[0], AnnoTree):
             d[datum.label()] = metadataToDict(datum)
         else:
             d[datum.label()] = datum[0]
@@ -361,10 +377,10 @@ def dictToMetadata(d, label=""):
     keys = list(d.keys())
     l = []
     for k in keys:
-        l.append(AnnoTree.Tree(k, dictToMetadata(d[k])))
+        l.append(AnnoTree(k, dictToMetadata(d[k])))
     l.sort()  # Not technically needed, except to make
     # the output predctable for unit tests
-    return AnnoTree.Tree(label, l)
+    return AnnoTree(label, l)
 
 
 # TODO: unify the calling convention of these fns, so we don't need *args
@@ -382,7 +398,7 @@ def deepTreeToHtml(tree, *args):
             if t.label() == "META":
                 # Find this tree's metadata; we will need it later
                 metadata = t
-            elif isinstance(t[0], AnnoTree.Tree):
+            elif isinstance(t[0], AnnoTree):
                 # if this tree has branching daughters, other than META,
                 # then it is not a leaf.
                 isLeaf = False
@@ -405,38 +421,13 @@ def deepTreeToHtml(tree, *args):
     return res
 
 
-def writeTreesToFile(meta, trees, filename, reformat=False, fix_indices=False):
-    if not isinstance(trees, str):
-        raise AnnotaldException("writeTreesToFile got a non-string!")
-
-    trees = trees.split("\n\n")
-    trees = [x for x in trees if x != ""]
-
-    if reformat or fix_indices:
-        trees = [AnnoTree.Tree.fromstring(s) for s in trees]
-        if fix_indices:
-            trees = list(map(rewriteIndices, trees))
-        trees = list(map(_formatTree, trees))
-        try:
-            meta = _formatTree(AnnoTree.Tree(meta))
-        except:
-            # the metadata tree did not parse
-            pass
-
-    fn = filename
-    if os.name != "nt":
-        fn = filename + ".tmp"
-    with codecs.open(fn, "w", "utf-8") as f:
-        if meta and meta != "":
-            f.write(meta + "\n\n")
-        f.write("\n\n".join(trees))
-
-    if os.name != "nt":
-        os.rename(fn, filename)
+def writeTreesToFile(meta, trees_str, filename, reformat=False, fix_indices=False):
+    with open(filename, "w") as f:
+        print(trees_str)
+        f.write(trees_str)
 
 
 def is_leaf(tree):
-    # return (len(tree) == 1 and isinstance(tree[0], str)) or isinstance(tree, str)
     return isinstance(tree[0], str) or isinstance(tree, str)
 
 
@@ -446,11 +437,10 @@ def _formatTree(tree, indent=0):
         # This is a leaf node
         return str(tree)
     else:
-        label = tree.label() if isinstance(tree, AnnoTree) else str(tree) + "jo"
         s = "(%s " % (str(tree.label()))
-        l = len(s)
-        leaves = ("\n" + " " * (indent + l)).join(
-            [_formatTree(x, indent + l) for x in tree]
+        width = len(s)
+        leaves = ("\n" + " " * (indent + width)).join(
+            [_formatTree(x, indent + width) for x in tree]
         )
         return "%s%s%s" % (s, leaves, ")")
 
@@ -559,7 +549,7 @@ def _stripLemma(s):
 
 
 def _getText(tree_text, strip_lemmata=False):
-    tree = AnnoTree.Tree(tree_text)
+    tree = AnnoTree(tree_text)
     to_delete = []
     for i, t in enumerate(tree):
         if t.label() in ["ID", "METADATA"]:
@@ -652,7 +642,7 @@ def _shouldIndexLeaf(tree):
         print(tree.pprint())
         print("Whole tree (from root): ")
         r = tree.root
-        if not isinstance(r, AnnoTree.Tree):
+        if not isinstance(r, AnnoTree):
             r = r()
         print(r.pprint())
         raise e
