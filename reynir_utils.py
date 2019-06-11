@@ -389,7 +389,7 @@ def tok_stream_to_null_icepahc(tok_stream):
 
 def tok_stream_to_null_reynir(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
-    root = AnnoTree("P", [AnnoTree("S-MAIN", [AnnoTree("X", [escape_parens(str(tok))]) for tok in tok_stream])])
+    root = AnnoTree("P", [AnnoTree("S-MAIN", [AnnoTree("x", [escape_parens(str(tok))]) for tok in tok_stream])])
     return root
 
 
