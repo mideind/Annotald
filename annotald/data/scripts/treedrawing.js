@@ -615,31 +615,28 @@ function updateSelection() {
     // update selection display
     $('.snodesel').removeClass('snodesel');
 
-    if (startnode && endnode) {
+    let sel = get_selection();
+    if (sel.is_multi) {
         let runner = startnode;
         $(runner).addClass('snodesel');
         while (runner != endnode) {
             runner = runner.nextElementSibling;
             $(runner).addClass('snodesel');
         }
-    } else if (startnode) {
-        $(startnode).addClass('snodesel');
+    } else if (sel.start) {
+        $(sel.start.elem).addClass('snodesel');
     }
 
     updateMetadataEditor();
-    updateUrtext();
+    updateUrtext(sel);
 }
 
-function updateUrtext() {
-    if (startnode) {
-        var tr = getTokenRoot($(startnode));
-        var str = currentTextPretty($(tr), " ");
-        var md = JSON.parse(tr.getAttribute("data-metadata"));
-        var id = (md || {ID: ""}).ID;
-        if (id !== "") {
-            id = "<b>" + id + "</b>: ";
-        }
-        $("#urtext").html(id + escapeHtml(str)).show();
+function updateUrtext(sel) {
+    console.log(sel)
+    // debugger;
+    if (sel.start) {
+        let text = tree_to_text(sel.start.root_node);
+        $("#urtext").text(text).show();
     } else {
         $("#urtext").hide();
     }
@@ -2344,6 +2341,7 @@ function save(e) {
                 },
                 error: function (args) {
                     displayInfo("Error occurred during saving");
+                    console.error(args);
                 },
                 complete: function (args) {
                     saveInProgress = false;
@@ -2351,49 +2349,6 @@ function save(e) {
             });
         }, 0);
     }
-}
-
-function old_save(e) {
-    console.log("old_save");
-    // let data = {};
-    // if (document.getElementById("leafphrasebox") ||
-    //     document.getElementById("labelbox")) {
-    //     // It should be impossible to trigger a save in these conditions, but
-    //     // it causes data corruption if the save happens,, so this functions
-    //     // as a last-ditch safety.
-    //     displayError("Cannot save while editing a node label.");
-    //     return;
-    // }
-    // if (!saveInProgress) {
-    //     displayInfo("Saving...");
-    //     saveInProgress = true;
-    //     setTimeout(function () {
-    //         debugger;
-    //         // var tosave = toLabeledBrackets($("#editpane"));
-    //         // extraArgs.trees = tosave;
-    //         data.trees = get_all_trees();
-    //         // debugger;
-    //         data.startTime = startTime;
-    //         $.ajax({
-    //             type: "POST",
-    //             url: "/doSave",
-    //             data: data,
-    //             success: function (args) {
-    //                 console.log("sucess", args);
-    //                 saveInProgress = false;
-    //             },
-    //             dataType: "json",
-    //         });
-    //         // $.post("/doSave", data, saveHandler).error(function () {
-    //         //     lastsavedstate = "";
-    //         //     saveInProgress = false;
-    //         //     displayError("Save failed, could not " +
-    //         //                  "communicate with server!");
-    //         // });
-    //         // unAutoIdle();
-    //         // lastsavedstate = $("#editpane").html();
-    //     }, 100);
-    // }
 }
 
 // ========== Validating

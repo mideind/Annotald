@@ -528,12 +528,14 @@ function terminal_to_flat_terminal(terminal) {
         head = terminal.cat;
     }
     let tail = [];
-    for (name of CATEGORY_TO_VARIANT_NAMES[terminal.cat]) {
-        if (name === "obj1" || name === "obj2") {
-            // already inserted case control
-            continue;
+    if (CATEGORY_TO_VARIANT_NAMES[terminal.cat]) {
+        for (name of CATEGORY_TO_VARIANT_NAMES[terminal.cat]) {
+            if (name === "obj1" || name === "obj2") {
+                // already inserted case control
+                continue;
+            }
+            variants[name] ? tail.push(variants[name]) : 0;
         }
-        variants[name] ? tail.push(variants[name]) : 0;
     }
     tail = tail.join("_");
     ret = [head];
@@ -677,6 +679,7 @@ function get_rooted_node_by_elem (sel_elem) {
         root_elem: path_obj.root,
         root_node: root_node,
         node: sel_node,
+        elem: sel_elem,
     };
 
     return rooted_node;
@@ -932,6 +935,7 @@ function undoable_dom_swap(sel) {
     let root_elem_in = sel.start.root_elem;
     let root_elem_out = tree_to_dom_elem(sel.start.root_node);
     root_elem_out.id = root_elem_in.id;
+    root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id
     // use legacy undo system defined in treedrawing.js
     undoBeginTransaction();
     $(touchTree($(root_elem_in)));
@@ -1030,6 +1034,28 @@ let leaf_example_so_2 = {
     terminal: "so_2_þgf_þf_gm_vh_þt_ft_p1"
 };
 
+/**
+ * Retrieve text of leaves in tree by inorder traversal
+ */
+function tree_to_text(tree) {
+    function _tree_to_text_inner(tree) {
+        if (tree.terminal) {
+            return [tree.text];
+        }
+        if (tree.nonterminal) {
+            let buffer = [];
+            for (let child of tree.children) {
+                buffer.push(... _tree_to_text_inner(child));
+            }
+            return buffer;
+        }
+        console.error("Unreachable");
+        return [];
+    }
+
+    return _tree_to_text_inner(tree).join(" ");
+}
+
 let tree_example = {
     nonterminal: "NP-SUBJ",
     children: [leaf_example_no]
@@ -1047,6 +1073,7 @@ function populate_context_menu_nonterminal(sel) {
     let names = [... NONTERMINAL_CYCLE];
     let extensions = NONTERMINAL_NAME_TO_CYCLE[cat] || [];
 
+    console.log(sel);
     function make_item(suggestion) {
         let attrs = {
             class: "conMenuItem",
@@ -1091,15 +1118,11 @@ function populate_context_menu_terminal(sel) {
     let curr_flat_term = node.terminal;
     let names = [... TERMINAL_CYCLE];
     /*
-      get root of tree
-      get id of tree at root
-      get index of leaf by inorder traversal
+      bin feature
       fetch bin candidates for terminal, BIN_CANDIDATES[tree_id][leaf_idx]
       sort_by_prefix_length(candidates, curr_flat_term)
       sort_by_lcs_length(candidates, curr_flat_term)
-
-      // names and candidates must become an html elem with a dataset tag
-     */
+    */
     function make_item(suggestion) {
         let attrs = {
             class: "conMenuItem",
@@ -1114,7 +1137,8 @@ function populate_context_menu_terminal(sel) {
     function handle_terminal_mouse_down(e) {
         let ev = e || window.event;
         let sug = ev.srcElement.dataset.suggestion || ev.srcElement.parentElement.dataset.suggestion;
-        console.log(sug)
+        sel.start.node.cat = sug;
+        sel.start.node.terminal = terminal_to_flat_terminal(sel.start.node);
         undoable_dom_swap(sel);
         clearSelection();
     }
@@ -1279,7 +1303,7 @@ function customCommands() {
     addCommand({ keycode: KEYS.A}, with_sel_singular({
         // TODO: bin_cycle
         terminal: not_implemented_fn,
-        nonterminal: populate_context_menu_nonterminal,
+        nonterminal: not_implemented_fn,
     }));
 
     addCommand({ keycode: KEYS.S}, with_sel_singular({

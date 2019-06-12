@@ -352,12 +352,17 @@ body {
 }
 
 #urtext {
+    display: block;
+    text-align: center;
     position: fixed;
+    left: 0;
+    right: 0;
     bottom: 4px;
-    left: 15%;
+    width: 60%;
+    padding: 4px;
+    margin: 1% auto;
     background-color: #D2B48C;
     border: 1px solid black;
-    padding: 4px;
 }
 
 /* Greynir nonterminal styling */
