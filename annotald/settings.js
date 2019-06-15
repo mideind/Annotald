@@ -935,7 +935,7 @@ function undoable_dom_swap(sel) {
     let root_elem_in = sel.start.root_elem;
     let root_elem_out = tree_to_dom_elem(sel.start.root_node);
     root_elem_out.id = root_elem_in.id;
-    root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id
+    root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id;
     // use legacy undo system defined in treedrawing.js
     undoBeginTransaction();
     $(touchTree($(root_elem_in)));
@@ -1073,7 +1073,6 @@ function populate_context_menu_nonterminal(sel) {
     let names = [... NONTERMINAL_CYCLE];
     let extensions = NONTERMINAL_NAME_TO_CYCLE[cat] || [];
 
-    console.log(sel);
     function make_item(suggestion) {
         let attrs = {
             class: "conMenuItem",
