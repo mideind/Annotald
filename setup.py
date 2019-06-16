@@ -26,7 +26,7 @@ setup_args = {
 
 setup(
     packages=["annotald"],
-    scripts=["bin/annotald"],
+    scripts=["bin/annotald", "bin/annoparse"],
     package_data={
         "annotald": ["data/*/*", "settings.py", "settings.js"]
     },

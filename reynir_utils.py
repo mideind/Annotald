@@ -45,12 +45,6 @@ except ImportError as e:
 import annotald.util as util
 
 
-class SCHEMES:
-    ICEPAHC = "icepahc"
-    REYNIR = "reynir"
-    BOTH = [ICEPAHC, REYNIR]
-
-
 _CASE_MAP = {"nf": "N", "þf": "A", "þgf": "D", "ef": "G"}
 _DEGREE_MAP = {"ms": "R", "evb": "S", "esb": "S", "est": "S"}
 _NUMBER_MAP = {"et": "", "ft": "S"}
@@ -81,57 +75,9 @@ MODALS = frozenset(["mega", "munu", "skulu", "vilja", "geta", "fá"])
 SPECIAL_VERBS = frozenset(_SPECIAL_VERB_MAP.keys())
 
 
-_GREYNIR_ICEPACH_NT_MAP = {
-    "P": "IP-MAT",
-    "S-MAIN": "IP",
-    "S": "CP",
-    "S-COND": "CP-COND",
-    "S-CONS": "CP-CONS",
-    "S-REF": "CP-REL",
-    "S-EXPLAIN": "IP-INF-PRP",
-    "S-QUOTE": "CP-QUOTE",
-    "S-PREFIX": "CP-PREFIX",
-    "S-ADV-TEMP": "CP-ADV-TMP",
-    "S-ADV-PURP": "CP-ADV-PRP",
-    "S-ADV-ACK": "CP-ADV-ACK",
-    "S-ADV-CONS": "CP-ADV-CONS",
-    "S-ADV-CAUSE": "CP-ADV-CAUSE",
-    "S-ADV-COND": "CP-ADV-CND",
-    "S-THT": "CP-THT",
-    "S-QUE": "CP-QUE",
-    "VP-SEQ": "VP-SEQ",
-    "VP": "VP",
-    "VP-PP": "VP-PP",
-    "NP": "NP",
-    "NP-POSS": "NP-POSS",
-    "NP-DAT": "NP-DAT",
-    "NP-ADDR": "NP-ADDR",
-    "NP-TITLE": "NP-TITLE",
-    "NP-AGE": "NP-AGE",
-    "NP-MEASURE": "NP-MEASURE",
-    "NP-SUBJ": "NP-SBJ",
-    "NP-OBJ": "NP-OB1",
-    "NP-IOBJ": "NP-OB2",
-    "NP-PRD": "NP-PRD",
-    "ADVP": "ADVP",
-    "ADVP-DATE": "ADVP-TMP",
-    "ADVP-DATE-ABS": "ADVP-TMP",
-    "ADVP-DATE-REL": "ADVP-TMP",
-    "ADVP-TIMESTAMP": "ADVP-TMP",
-    "ADVP-TIMESTAMP-ABS": "ADVP-TMP",
-    "ADVP-TIMESTAMP-REL": "ADVP-TMP",
-    "ADVP-TMP-SET": "ADVP-TMP",
-    "ADVP-DUR": "ADVP-TMP",
-    "ADVP-DUR-ABS": "ADVP-TMP",
-    "ADVP-DUR-REL": "ADVP-TMP",
-    "ADVP-DUR-TIME": "ADVP-TMP",
-    "PP": "PP",
-    "ADJP": "ADJP",
-    "IP": "IP",
-}
-
 def escape_parens(text):
     return text.replace("(", r"\(").replace(")", r"\)")
+
 
 def simpleTree2NLTK(tt):
     """ Convert Reynir SimpleTree to NLTK Tree
@@ -170,223 +116,6 @@ def simpleTree2NLTK(tt):
     return terminal
 
 
-def treemap(tree, nonterm_fn, term_fn):
-    """ Transform labels of NLTK Tree,
-        return a new transformed tree"""
-    if util.is_leaf(tree):
-        # terminal node
-        return AnnoTree(term_fn(tree.label()), [tree[0]])
-    else:
-        # nonterminal node
-        label = nonterm_fn(tree.label())
-        children = [treemap(subtree, nonterm_fn, term_fn) for subtree in tree]
-        return AnnoTree(label, children)
-
-
-def reynir_tree_to_icepach(simple_tree, affix_lemma=1):
-    """ Outer function for _reynir_tree_to_icepach """
-    nltk_tree = _reynir_tree_to_icepach(simple_tree, affix_lemma=affix_lemma)
-    return AnnoTree("", nltk_tree)
-
-
-def _reynir_tree_to_icepach(tree, affix_lemma=1):
-    """ Transform Reynir SimpleTree to IcePaHC NLTK Tree """
-    if tree._len > 1 or tree._children:
-        # Children present: Array or nonterminal
-        xp = tree.tag
-        xp = _GREYNIR_ICEPACH_NT_MAP.get(xp, xp)
-        children = []
-        for child in [_reynir_tree_to_icepach(child) for child in tree.children]:
-            if isinstance(child, AnnoTree):
-                children.append(child)
-            else:
-                children.extend(child)
-
-        # Merge trees according to:
-        # IP-MAT idomsonly IP => (merge IP-MAT IP)
-        # !IP idoms IP => (rename IP IP-SUB)
-        # !VP-SEQ idoms VP-SEQ => (merge !VP-SEQ VP-SEQ)
-        # !VP idoms VP => (merge !VP VP)
-        if tree.tag in ("S-MAIN",):
-            # Merge P and S-MAIN and IP
-            return children
-        ext_children = []
-        if xp == "IP-MAT" and children and children[0].label() == "IP":
-            children = [c for c in children[0]] + (children[1:])
-
-        for child in children:
-            label = child.label()
-            if xp and xp[:2] != "IP" and label == "IP":
-                ext_children.append(child)
-                child.set_label("IP-SUB")
-            elif label in ("VP-SEQ", "VP"):
-                for desc in child:
-                    ext_children.append(desc)
-            else:
-                ext_children.append(child)
-
-        else:
-            node = AnnoTree(xp, ext_children)
-            return [node]
-
-    # No children
-    if tree._head.get("k") == "PUNCTUATION":
-        # Punctuation
-        lemma_suffix = "" if not affix_lemma else "-" + tree.text
-        return AnnoTree(tree.text, [tree.text + lemma_suffix])
-
-    extra_leaves = []
-    leaf_tag = tree.tcat
-
-    if leaf_tag == "ao":
-        if tree.lemma.lower() in ("ekki", "eigi", "ei"):
-            leaf_tag = "NEG"
-        else:
-            leaf_tag = "ADV"
-
-    elif leaf_tag in ("pfn", "fn"):
-        leaf_tag_stem = _NP_TAG_MAP.get(leaf_tag, "[{0}]".format(leaf_tag))
-        if tree.lemma.lower() in ("sá", "þessi", "hinn"):
-            leaf_tag_stem = "D"
-
-        leaf_case = CASES.intersection(tree.variants)
-        leaf_case = (
-            ""
-            if not leaf_case
-            else _CASE_MAP.get(next(iter(leaf_case)), "[{0}]".format(leaf_case))
-        )
-        leaf_case_suffix = "" if not leaf_case else "-" + leaf_case
-
-        leaf_tag = "{stem}{case}".format(stem=leaf_tag_stem, case=leaf_case_suffix)
-
-    elif leaf_tag in ("no", "person", "entities", "sérnafn", "fyrirtæki"):
-        leaf_tag_stem = _NP_TAG_MAP.get(leaf_tag, "[{0}]".format(leaf_tag))
-
-        leaf_number = "S" if "ft" in tree.all_variants else ""
-
-        leaf_case = CASES.intersection(tree.variants)
-        leaf_case = (
-            ""
-            if not leaf_case
-            else _CASE_MAP.get(next(iter(leaf_case)), "[{0}]".format(leaf_case))
-        )
-        leaf_case_suffix = "" if not leaf_case else "-" + leaf_case
-
-        leaf_tag = "{stem}{number}{case}".format(
-            stem=leaf_tag_stem, number=leaf_number, case=leaf_case_suffix
-        )
-        if "gr" in tree.all_variants:
-            lemma_suffix = "" if not affix_lemma else "-hinn"
-            det_leaf = AnnoTree("D" + leaf_case_suffix, ["$" + lemma_suffix])
-            extra_leaves.append(det_leaf)
-
-    elif leaf_tag == "lo":
-        leaf_tag_stem = "ADJ"
-
-        leaf_case = CASES.intersection(tree.all_variants)
-        leaf_case = (
-            ""
-            if not leaf_case
-            else "-" + _CASE_MAP.get(next(iter(leaf_case)), "[{0}]".format(leaf_case))
-        )
-        leaf_case = "" if not leaf_case else leaf_case
-
-        leaf_degree = DEGREES.intersection(tree.all_variants)
-        leaf_degree = (
-            ""
-            if not leaf_degree
-            else _DEGREE_MAP.get(next(iter(leaf_degree)), "[{0}]".format(leaf_degree))
-        )
-
-        leaf_tag = "{stem}{degree}{case}".format(
-            stem=leaf_tag_stem, degree=leaf_degree, case=leaf_case
-        )
-
-    elif leaf_tag == "tao":
-        leaf_tag = "ADV"
-
-        leaf_degree = DEGREES.intersection(tree.all_variants)
-        leaf_degree = (
-            ""
-            if not leaf_degree
-            else _DEGREE_MAP.get(next(iter(leaf_degree)), "[{0}]".format(leaf_degree))
-        )
-        leaf_tag = "{stem}{degree}".format(stem=leaf_tag, degree=leaf_degree)
-
-    elif leaf_tag == "nhm":
-        leaf_tag = "TO"
-
-    elif leaf_tag == "so":
-        lemma = tree.lemma.lower()
-
-        leaf_tag = "VB"
-        if lemma in MODALS:
-            leaf_tag = "MD"
-            _ = 1
-        elif lemma in SPECIAL_VERBS:
-            leaf_tag = _SPECIAL_VERB_MAP.get(lemma, "[{0}]".format(lemma))
-
-        leaf_tense = TENSES.intersection(tree.all_variants)
-        leaf_tense = (
-            ""
-            if not leaf_tense
-            else _TENSE_MAP.get(next(iter(leaf_tense)), "[{0}]".format(leaf_tense))
-        )
-
-        leaf_mood = MOODS.intersection(tree.all_variants)
-        leaf_mood = (
-            ""
-            if not leaf_mood
-            else _MOOD_MAP.get(next(iter(leaf_mood)), "[{0}]".format(leaf_mood))
-        )
-
-        if not frozenset(["sagnb", "bh", "lh", "lhþt"]).intersection(tree.all_variants):
-            leaf_tag = "{stem}{tense}{mood}".format(
-                stem=leaf_tag, tense=leaf_tense, mood=leaf_mood
-            )
-        elif "sagnb" in tree.all_variants:
-            leaf_tag = leaf_tag + "N"
-        elif "bh" in tree.all_variants:
-            leaf_tag = leaf_tag + "I"
-        elif "lh" in tree.all_variants:
-            leaf_tag = leaf_tag[:1] + "AG"
-        elif "lhþt" in tree.all_variants:
-            leaf_tag = leaf_tag[:1] + "AN"
-
-    elif leaf_tag in ("st", "stt"):
-        leaf_tag = "C"
-
-    elif leaf_tag == "fs":
-        leaf_tag = "P"
-
-    elif leaf_tag == "eo":
-        leaf_tag = "ADV"
-
-    elif leaf_tag == ("to", "töl"):
-        if lemma == "einn":
-            leaf_tag = "ONE"
-        else:
-            leaf_tag = "NUM"
-
-            leaf_case = CASES.intersection(tree.variants)
-            leaf_case = (
-                "" if not leaf_case else _CASE_MAP.get(next(iter(leaf_case)), "")
-            )
-            leaf_case = "" if not leaf_case else "-" + leaf_case
-
-            leaf_tag = "{stem}{case}".format(stem=leaf_tag, case=leaf_case)
-
-    # print("{:>25s}{:>40s}".format(tree.text, tree.terminal_with_all_variants))
-    lemma_suffix = "" if not affix_lemma else "-{0}".format(tree.lemma.lower())
-    leaf = AnnoTree(leaf_tag, ["{0}{1}".format(tree.text, lemma_suffix)])
-    return [leaf] + extra_leaves
-
-
-def tok_stream_to_null_icepahc(tok_stream):
-    """ Constuct bare minimal NLTK.Tree from a token stream """
-    root = AnnoTree("", [AnnoTree("IP-MAT", [AnnoTree("X", [str(tok)]) for tok in tok_stream])])
-    return root
-
 def tok_stream_to_null_reynir(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
     toks = [escape_parens(str(tok)) for tok in tok_stream]
@@ -404,69 +133,51 @@ def insert_id(tree, prefix, index):
     tree.insert(0, AnnoTree("ID", [id_str]))
 
 
-def reynir_sentence_to_icepahc(sent):
-    """ Transform a parsed sentence from Reynir _Sentence object to
-        an NLTK.Tree parse tree """
-    if sent.tree is not None:
-        nltk_tree = reynir_tree_to_icepach(sent.tree)
-    else:
-        nltk_tree = tok_stream_to_null_icepahc([tok.txt for tok in sent._s if tok])
-    return nltk_tree
-
 def reynir_sentence_to_reynir(sent):
     if sent.tree is not None:
         nltk_tree = simpleTree2NLTK(sent.tree)
     else:
         nltk_tree = tok_stream_to_null_reynir([tok.txt for tok in sent._s if tok])
-    return AnnoTree("", [ nltk_tree ])
+    return AnnoTree("", [nltk_tree])
+
 
 def parse_single(
-    text, affix_lemma=1, id_prefix=None, start_index=1, scheme=SCHEMES.ICEPAHC
-):
+    text, affix_lemma=1, id_prefix=None, start_index=1):
     """ Parse a single sentence into mostly IcePaHC conformant parse trees
         using a transformation of reynir's parse trees """
     r = Reynir()
     sent = r.parse_single(text)
-    if scheme == SCHEMES.ICEPAHC:
-        nltk_tree = reynir_sentence_to_icepahc(sent)
-    else:
-        nltk_tree = reynir_sentence_to_reynir(sent.tree)
+    nltk_tree = reynir_sentence_to_reynir(sent.tree)
     if id_prefix is not None:
         insert_id(nltk_tree, id_prefix, start_index)
     return nltk_tree
 
 
-def parse_text(
-    text, affix_lemma=1, id_prefix=None, start_index=1, scheme=SCHEMES.ICEPAHC
-):
+def parse_text(text, affix_lemma=1, id_prefix=None, start_index=1):
     """ Parse contiguous text into mostly IcePaHC conformant parse trees
         using a transformation of reynir's parse trees """
     r = Reynir()
     dd = r.parse(text)
     for idx, sent in enumerate(dd["sentences"]):
-        if scheme == SCHEMES.ICEPAHC:
-            nltk_tree = reynir_sentence_to_icepahc(sent)
-        else:
-            nltk_tree = reynir_sentence_to_reynir(sent)
+        nltk_tree = reynir_sentence_to_reynir(sent)
         if id_prefix is not None:
             insert_id(nltk_tree, id_prefix, start_index + idx)
         yield nltk_tree
 
 
-def annotate_file(in_path, out_path, scheme=SCHEMES.ICEPAHC):
+def annotate_file(in_path, out_path):
     print("Parsing file {0}".format(in_path))
     print("Output file is {0}".format(out_path))
     with in_path.open(mode="r") as in_handle:
         text = in_handle.read()
         with Path(out_path).open(mode="w") as out_handle:
-            for tree in parse_text(text, id_prefix=in_path.name, scheme=scheme):
-                formatted_trees = util._formatTree(tree)
-                out_handle.write(formatted_trees)
+            for tree in parse_text(text, id_prefix=in_path.name):
+                formatted_tree = tree.pretty()
+                out_handle.write(formatted_tree)
                 out_handle.write("\n")
                 out_handle.write("\n")
 
-
-if __name__ == "__main__":
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -494,19 +205,18 @@ if __name__ == "__main__":
         "-o",
         "--out_path",
         dest="out_path",
-        required=True,
+        required=False,
         default="default",
         help="Path to output file",
     )
-    parser.add_argument(
-        "-s",
-        "--scheme",
-        dest="scheme",
-        required=False,
-        choices=SCHEMES.BOTH,
-        default=SCHEMES.ICEPAHC,
-        help="Annotation scheme for output trees. Defaults to IcePaHC-like",
-    )
 
     args = parser.parse_args()
-    annotate_file(args.in_path, args.out_path, scheme=args.scheme)
+    out_path = args.out_path
+    if out_path is None:
+        out_path = args.in_path.with_suffix(".psd")
+    annotate_file(args.in_path, out_path)
+
+
+if __name__ == "__main__":
+    main()
+
