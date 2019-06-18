@@ -367,20 +367,44 @@ body {
 
 /* Greynir nonterminal styling */
 
-div.nonterminal-s {
-    background: #f2ac7c;
-    border-left: 4px solid #b57b3c;
+.nonterminal-adjp-bak {
+    background: #bcd8ac;
+    border-left: 4px solid #3a963a;
 }
 
 .nonterminal-adjp {
-    /* background: #5cb-85c; */
-    background: #bcd8ac;
-    border-left: 4px solid #3a963a;
+    background: #9cd8c8;
+    border-left: 4px solid #9cd8c8;
 }
 
 .nonterminal-advp {
     background: #bcd8ac;
     border-left: 4px solid #3a963a;
+}
+
+.nonterminal-cp {
+    background: #f00;
+    border-left: 4px solid #900;
+}
+
+.nonterminal-c {
+    background: #f00;
+    border-left: 4px solid #900;
+}
+
+.nonterminal-dateabs {
+    background: #f00;
+    border-left: 4px solid #900;
+}
+
+.nonterminal-daterel {
+    background: #f00;
+    border-left: 4px solid #900;
+}
+
+.nonterminal-inf {
+    background: #f00;
+    border-left: 4px solid #900;
 }
 
 div.nonterminal-ip {
@@ -394,13 +418,23 @@ div.nonterminal-ip {
 }
 
 .nonterminal-p {
-    background: #aaa0aa;
-    border-left: 4px solid #443944;
+    background: #f00;
+    border-left: 4px solid #900;
 }
 
 .nonterminal-pp {
     background: #ac96cb;
     border-left: 4px solid #935093;
+}
+
+div.nonterminal-s {
+    background: #f2ac7c;
+    border-left: 4px solid #b57b3c;
+}
+
+div.nonterminal-s0 {
+    background: #ccc;
+    border-left: 4px solid #443944;
 }
 
 .nonterminal-vp {

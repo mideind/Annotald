@@ -117,19 +117,14 @@ class Treedraw(object):
             self.trees[self.treeIndexStart : self.treeIndexEnd] = trees
             self.treeIndexEnd = self.treeIndexStart + len(trees)
         else:
-            # TODO: this case is mildly inefficent, since we strip and then
-            # join
             self.trees = trees
         return "\n\n".join(self.trees)
 
-    # def doSave(self, trees=None, startTime=None, force=None, update_md5=None):
-    # def doSave(self, trees=None):
     @cherrypy.expose
     @cherrypy.tools.json_in()
     @cherrypy.tools.json_out()
     def doSave(self, data=None):
         data = data or cherrypy.request.json
-        # ic(data)
         trees = data["trees"]
 
         cherrypy.response.headers["Content-Type"] = "application/json"
@@ -221,7 +216,6 @@ class Treedraw(object):
         # tosave = tosave.replace("-FLAG", "")
 
         try:
-            # util.writeTreesToFile(self.versionCookie, tosave, self.thefile)
             util.writeTreesToFile(self.versionCookie, output_str, self.thefile)
             self.doLogEvent({"type": "save"})
             return dict(result="success")

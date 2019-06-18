@@ -120,7 +120,7 @@ def tok_stream_to_null_reynir(tok_stream):
     """ Constuct bare minimal NLTK.Tree from a token stream """
     toks = [escape_parens(str(tok)) for tok in tok_stream]
     toks = [AnnoTree("x", [tok, AnnoTree("lemma", [tok])]) for tok in toks]
-    tree = AnnoTree("P", [AnnoTree("S-MAIN", toks)])
+    tree = AnnoTree("S0", [AnnoTree("S-MAIN", toks)])
     return tree
 
 
@@ -166,8 +166,8 @@ def parse_text(text, affix_lemma=1, id_prefix=None, start_index=1):
 
 
 def annotate_file(in_path, out_path):
-    print("Parsing file {0}".format(in_path))
-    print("Output file is {0}".format(out_path))
+    print("Parsing input file: {0}".format(in_path))
+    print("Writing output to file: {0}".format(out_path))
     with in_path.open(mode="r") as in_handle:
         text = in_handle.read()
         with Path(out_path).open(mode="w") as out_handle:
@@ -181,7 +181,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        "Parse a text file of contiguous text into IcePaHC-like parse trees"
+        "Parse a text file of contiguous text into Reynir parse trees"
     )
 
     def file_type_guard(path):
@@ -206,7 +206,6 @@ def main():
         "--out_path",
         dest="out_path",
         required=False,
-        default="default",
         help="Path to output file",
     )
 

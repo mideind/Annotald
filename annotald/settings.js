@@ -87,245 +87,341 @@ const KEYS = {
 const FORWARD = true;
 const BACKWARD = false;
 
-const NONTERMINAL_CYCLE = [
-    "ADJP",
-    "ADVP",
-    "IP",
-    "NP",
-    // "P",
-    "PP",
-    "S",
-    "VP",
-];
+const ENUM = {
+    NONTERMS: [
+        "ADJP",
+        "ADVP",
+        "C",
+        "CP",
+        "DATEABS",
+        "DATEREL",
+        "INF",
+        "IP",
+        "NP",
+        "P",
+        "PP",
+        "S",
+        "S0",
+        "VP",
+    ],
+    NONTERM_SUFFIX: {
+        ADVP: [
+            "ADVP",
+            "ADVP-DATE",
+            "ADVP-DATE-ABS",
+            "ADVP-DATE-REL",
+            "ADVP-DIR",
+            "ADVP-DUR",
+            "ADVP-DUR-ABS",
+            "ADVP-DUR-REL",
+            "ADVP-DUR-TIME",
+            "ADVP-TIMESTAMP",
+            "ADVP-TIMESTAMP-ABS",
+            "ADVP-TIMESTAMP-REL",
+            "ADVP-TMP-SET",
+        ],
+        CP: [
+            "CP-ADV-ACK",
+            "CP-ADV-CAUSE",
+            "CP-ADV-COND",
+            "CP-ADV-CONS",
+            "CP-ADV-PURP",
+            "CP-ADV-TEMP",
+            "CP-EXPLAIN",
+            "CP-QUE",
+            "CP-REL",
+            "CP-THT",
+        ],
+        IP: [
+            "IP",
+            "IP-INF",
+        ],
+        NP: [
+            "NP",
+            "NP-ADDR",
+            "NP-AGE",
+            "NP-DAT",
+            "NP-IOBJ",
+            "NP-MEASURE",
+            "NP-OBJ",
+            "NP-PERSON",
+            "NP-POSS",
+            "NP-PRD",
+            "NP-SUBJ",
+            "NP-TITLE",
+        ],
+        S: [
+            "S",
+            "S-COND",
+            "S-CONS",
+            "S-EXPLAIN",
+            "S-HEADING",
+            "S-MAIN",
+            "S-PREFIX",
+            "S-QUE",
+            "S-QUOTE",
+        ],
+        VP: [
+            "VP",
+            "VP-AUX"
+        ],
+    },
+    TERM: [
+        "abfn",
+        "ao",
+        "ártal",
+        "dags",
+        "entity",
+        "eo",
+        "fn",
+        "fs",
+        "fyrirtæki",
+        "gata",
+        "gr",
+        "lo",
+        "nhm",
+        "no",
+        "p",
+        "person",
+        "pfn",
+        "prósenta",
+        "raðnr",
+        "sérnafn",
+        "so",
+        "spao",
+        "st",
+        "stt",
+        "tala",
+        "tímapunktur",
+        "tími",
+        "to",
+        "töl",
+        "uh",
+        ".",
+    ],
+    VAR: {
+        gender: ["kk", "kvk", "hk"],
+        number: ["et", "ft"],
+        case: ["nf", "þf", "þgf", "ef"],
+        article: ["gr"],
+        person: ["p1", "p2", "p3"],  // note: iirc gender and person can be mutually exclusive
+        mood: ["fh", "vh", "nh", "bh"],
+        tense: ["nt", "þt"],
+        degree: ["fst", "mst", "est"],
+        strength: ["vb", "sb"],
+        voice: ["mm", "gm"],  // "þm"
+        obj1: ["nf", "þf", "þgf", "ef"],
+        obj2: ["nf", "þf", "þgf", "ef"],
+        supine: ["sagnb"],
+        impersonal: ["op"],
+    },
+    DEFAULT_PARENT: {
+        // nonterminals
+        ADJP: "NP",
+        ADVP: "ADVP",
+        IP: "S",
+        NP: "IP",
+        P: "PP",
+        PP: "NP",
+        S: "S",
+        VP: "IP",
+        // terminals
+        abfn: "NP",
+        ao: "ADVP",
+        ártal: "ADVP",
+        dags: "ADVP",
+        entity: "NP",
+        eo: "ADJP",
+        fn: "NP",
+        fs: "PP",
+        fyrirtæki: "NP",
+        gata: "NP-ADDR",
+        gr: "NP",
+        lo: "ADJP",
+        nhm: "INF",
+        no: "NP",
+        p: "S",
+        person: "NP",
+        pfn: "NP",
+        prósenta: "ADJP",
+        raðnr: "ADJP",
+        sérnafn: "NP",
+        so: "VP",
+        spao: "ADVP",
+        st: "CP",
+        stt: "CP-REL",
+        tala: "NP",
+        tímapunktur: "ADVP",
+        tími: "ADVP",
+        to: "ADJP",
+        töl: "NP",
+        uh: "ADVP",
+        ".": "S",
+    },
+    CAT_TO_VAR: {
+        ao: ["degree"],
+        no: ["number", "case", "gender", "article"],
+        abfn: ["number", "case", "gender"],
+        fn: ["number", "case", "gender"],
+        pfn: ["number", "case", "gender", "person"],
+        gr: ["number", "case", "gender"],
+        tala: ["number", "case", "gender"],
+        töl: ["number", "case", "gender"],
+        to: ["number", "case", "gender"],
+        lo: ["number", "case", "gender", "degree", "strength"],
+        so: ["number", "tense", "supine", "mood",
+             "voice", "person", "obj1", "obj2"], // what about _subj ?
+        fs: ["obj1"],
+        person: ["case", "gender"],
+        raðnr: ["case", "gender"],
+        sérnafn: ["case"],
+    },
+    SHORT_01: {
+        NONTERM: [
+            "ADJP",
+            "ADVP",
+            "C",
+            "CP",
+            "DATEABS",
+            "DATEREL",
+            "INF",
+            "IP",
+            "NP",
+            "P",
+            "PP",
+            "S",
+            "S0",
+            "VP",
+        ],
+        ADVP: [
+            "ADVP",
+            "ADVP-DIR",
+            "ADVP-TMP-SET",
+        ],
+        CP: [
+            "CP-EXPLAIN",
+            "CP-QUE",
+            "CP-REL",
+            "CP-THT",
+        ],
+        IP: [
+            "IP",
+            "IP-INF",
+        ],
+        NP: [
+            "NP",
+            "NP-SUBJ",
+            "NP-OBJ",
+            "NP-IOBJ",
 
-const NP_CYCLE = [
-    "NP",
-    "NP-SUBJ",
-    "NP-OBJ",
-    "NP-IOBJ",
-    "NP-POSS",
-    "NP-PRD",
-    "NP-TITLE",
-    "NP-AGE",
-    "NP-DAT",
-    "NP-ADDRESS"
-];
+        ],
+        S: [
+            "S",
+            "S-MAIN",
+            "S-EXPLAIN",
+            "S-QUOTE",
+        ],
+        VP: [
+            "VP",
+            "VP-AUX"
+        ],
+    },
+    SHORT_02: {
+        NONTERM: [
+            "ADJP",
+            "ADVP",
+            "C",
+            "CP",
+            "DATEABS",
+            "DATEREL",
+            "INF",
+            "IP",
+            "NP",
+            "P",
+            "PP",
+            "S",
+            "S0",
+            "VP",
+        ],
+        ADVP: [
+            "ADVP-DATE",
+            "ADVP-DATE-ABS",
+            "ADVP-DATE-REL",
+        ],
+        CP: [
+            "CP-ADV-ACK",
+            "CP-ADV-CAUSE",
+            "CP-ADV-COND",
+            "CP-ADV-CONS",
+            "CP-ADV-PURP",
+            "CP-ADV-TEMP",
+        ],
+        NP: [
+            "NP-POSS",
+            "NP-PRD",
+            "NP-ADDR"
+        ],
+        S: [
+            "S-COND",
+            "S-CONS",
+            "S-HEADING",
+            "S-PREFIX",
+            "S-QUE",
+        ],
+    },
+    // SHORT_03: {
+    // NONTERM: [
+    //     "ADJP",
+    //     "ADVP",
+    //     "C",
+    //     "CP",
+    //     "DATEABS",
+    //     "DATEREL",
+    //     "INF",
+    //     "IP",
+    //     "NP",
+    //     "P",
+    //     "PP",
+    //     "S",
+    //     "S0",
+    //     "VP",
+    // ],
+    //     NP: [
+    //         "NP-AGE",
+    //         "NP-DAT",
+    //         "NP-MEASURE",
+    //         "NP-PERSON",
+    //         "NP-TITLE",
+    //     ],
+    //     ADVP: [
+    //         "ADVP-DUR",
+    //         "ADVP-DUR-ABS",
+    //         "ADVP-DUR-REL",
+    //         "ADVP-DUR-TIME",
+    //     ],
+    // },
+    // SHORT_04: {
+    //     NP: [
+    //     ],
+    //     ADVP: [
+    //         "ADVP-TIMESTAMP",
+    //         "ADVP-TIMESTAMP-ABS",
+    //         "ADVP-TIMESTAMP-REL",
+    //     ],
+    // }
+}
 
-const S_CYCLE = [
-    "S",
-    "S-ADV-ACK",
-    "S-ADV-CAUSE",
-    "S-ADV-COND",
-    "S-ADV-CONS",
-    "S-ADV-PURP",
-    "S-ADV-TEMP",
-    "S-EXPLAIN",
-    "S-MAIN",
-    "S-PREFIX",
-    "S-QUE",
-    "S-QUOTE",
-    "S-REF",
-    "S-THT"
-];
+/* Nonterminals without flags
+  S0
+  ADJP
+  DATEABS
+  DATEREL
+  INF
+  PP
+  */
 
-const ADVP_CYCLE = [
-    "ADVP",
-    "ADVP-DATE",
-    "ADVP-DUR"
-];
-
-const VP_CYCLE = [
-    "VP",
-    "VP-SEQ"
-];
-
-const TERMINAL_CYCLE = [
-    "abfn",
-    "ao",
-    "ártal",
-    "dags",
-    "entity",
-    "eo",
-    "fn",
-    "fs",
-    "fyrirtæki",
-    "gata",
-    "gr",
-    "lo",
-    "nhm",
-    "no",
-    "p",
-    "person",
-    "pfn",
-    "prósenta",
-    "raðnr",
-    "sérnafn",
-    "so",
-    "spao",
-    "st",
-    "stt",
-    "tala",
-    "tímapunktur",
-    "tími",
-    "to",
-    "töl",
-    "uh",
-    "."
-];
-
-const TERMINAL_VARIANT_NAMES = [
-    "number", "case", "gender",
-    "person",
-    "tense", "voice", "mood",
-    "op", "subj", "supine",
-    "degree",
-    "strength",
-    "obj1", "obj2"
-];
-
-const CATEGORY_TO_VARIANT_NAMES = {
-    ao: ["degree"],
-    no: ["number", "case", "gender", "article"],
-    abfn: ["number", "case", "gender"],
-    fn: ["number", "case", "gender"],
-    pfn: ["number", "case", "gender", "person"],
-    gr: ["number", "case", "gender"],
-    tala: ["number", "case", "gender"],
-    töl: ["number", "case", "gender"],
-    to: ["number", "case", "gender"],
-    lo: ["number", "case", "gender", "degree", "strength"],
-    so: ["number", "tense", "supine", "mood",
-         "voice", "person", "obj1", "obj2"], // what about _subj ?
-    fs: ["obj1"],
-    person: ["case", "gender"],
-    raðnr: ["case", "gender"],
-    sérnafn: ["case"],
-};
-
-const GENDER = ["kk", "kvk", "hk"];
-const NUMBER = ["et", "ft"];
-const CASE = ["nf", "þf", "þgf", "ef"];
-const ARTICLE = ["gr", ""];
-const PERSON = ["p1", "p2", "p3"];  // note: iirc gender and person can be mutually exclusive
-const MOOD = ["fh", "vh", "nh", "bh"];
-const TENSE = ["nt", "þt", ""];
-const DEGREE = ["fst", "mst", "est", ""];
-const STRENGTH = ["vb", "sb", ""];
-const VOICE = ["mm", "gm", ""];  // "þm"
-const CONTROL = ["nf", "þf", "þgf", "ef", ""];
-const SUPINE = ["sagnb", ""];
 // TODO: _op
 // TODO: _subj
-
-const VARIANT_NAME_TO_SUBVARIANTS = {
-    gender: GENDER,
-    number: NUMBER,
-    case: CASE,
-    article: ARTICLE,
-    person: PERSON,
-    mood: MOOD,
-    degree: DEGREE,
-    strength: STRENGTH,
-    voice: VOICE,
-    tense: TENSE,
-    supine: SUPINE,
-    obj1: CONTROL,
-    obj2: CONTROL,
-};
-
-const NONTERMINAL_NAME_TO_CYCLE = {
-    NP: NP_CYCLE,
-    S: S_CYCLE,
-    ADVP: ADVP_CYCLE,
-    VP: VP_CYCLE
-};
-
-const TERMINAL_CAT_TO_NONTERMINAL = {
-    abfn: "NP",
-    ao: "ADVP",
-    ártal: "ADVP",
-    dags: "ADVP",
-    entity: "NP",
-    eo: "ADJP",
-    fn: "NP",
-    fs: "PP",
-    fyrirtæki: "NP",
-    gata: "NP-ADDRESS",
-    gr: "NP",
-    lo: "ADJP",
-    nhm: "VP",
-    no: "NP",
-    p: "S",
-    person: "NP",
-    pfn: "NP",
-    prósenta: "ADJP",
-    raðnr: "ADJP",
-    sérnafn: "NP",
-    so: "VP",
-    spao: "ADVP",
-    st: "S",
-    stt: "S-REF",
-    tala: "NP",
-    tímapunktur: "ADVP",
-    tími: "ADVP",
-    to: "ADJP",
-    töl: "NP",
-    uh: "ADVP",
-    ".": "P",
-};
-
-const NONTERMINAL_CAT_TO_NONTERMINAL = {
-    ADJP: "NP",
-    ADVP: "ADVP",
-    IP: "S",
-    NP: "IP",
-    P: "P",
-    PP: "NP",
-    S: "S",
-    VP: "IP",
-};
-
-const SHORT_NP_CYCLE_1 = [
-    "NP",
-    "NP-SUBJ",
-    "NP-OBJ",
-    "NP-IOBJ",
-];
-
-const SHORT_NP_CYCLE_2 = [
-    "NP",
-    "NP-POSS",
-    "NP-PRD",
-    "NP-ADDRESS"
-];
-
-const SHORT_S_CYCLE_1 = [
-    "S",
-    "S-REF",
-    "S-THT"
-];
-
-const SHORT_S_CYCLE_2 = [
-    "S",
-    "S-MAIN",
-    "S-QUE",
-    "S-EXLAIN",
-];
-
-const SHORT_S_CYCLE_ALT_1 = [
-    "S-ADV-ACK",
-    "S-ADV-CAUSE",
-    "S-ADV-COND",
-    "S-ADV-CONS",
-    "S-ADV-PURP",
-    "S-ADV-TEMP",
-];
-
-// const SHORT_S_CYCLE_ALT_2 = [
-//     "S",
-//     "S-MAIN",
-//     "S-QUE",
-// ];
 
 /*
  * Get selected elems, convert to rooted trees
@@ -346,90 +442,14 @@ function get_selection () {
     return multi_sel;
 }
 
-/*
- * Propagate case change to relevant neighbours
- */
-function propagate_case (dom_node) {
-    console.log("Propagating case");
-    if (node.terminal) {
-        // case for terminal, determine parent, goto nonterminal case
-    } else {
-        // return propagate_case_from_parent(node);
-    }
-    return ;
-};
-
-function propagate_case_from_parent (node, new_case) {
-    // when parent is targeted directly, the new target case is undetermined
-    // an option is then to extract the case from the first terminal and cycle it
-
-    /* ADJP
-       Can stand alone, e.g. as complement to copula
-       Hann verður góður
-       Not a common parse error
-     */
-
-    /* ADVP
-       Some adverbs can have cases?
-     */
-
-    /* NP
-       Case changes should always propagate to terminals:
-     */
-
-    /* PP
-       controls case for governed NP
-       note: case cycling should skip null case
-     */
-
-    /* For reference
-       no: ["number", "case", "gender", "article"],
-       abfn: ["number", "case", "gender"],
-       fn: ["number", "case", "gender"],
-       pfn: ["number", "case", "gender"],
-       gr: ["number", "case", "gender"],
-       tala: ["number", "case", "gender"],
-       töl: ["number", "case", "gender"],
-       to: ["number", "case", "gender"],
-       lo: ["number", "case", "gender", "degree", "strength"],
-       so: ["number", "tense", "supine", "mood",
-            "voice", "person", "obj1", "obj2"], // what about _subj ?
-       fs: ["obj1"],
-       person: ["case", "gender"],
-       raðnr: ["case", "gender"],
-       sérnafn: ["case"],
-     */
-
-    /* VP
-       This should require special handling, since only the main verb can control these
-       and not auxiliary verbs, ergo need to determine head verb
-     */
-
-    /* Co-inflection (when sharing same parent IP)
-
-       NP-SUBJ.number and VP.number
-       NP-SUBJ.person and VP.person (pronouns)
-       NP-OBJ.case and VP.obj1
-       NP-IOBJ.case and VP.obj2
-    */
-    console.log("propagating_case_from_parent:", new_case);
-    for (leaf of node.children.filter((c) => c.terminal)) {
-        console.log(leaf);
-        if (leaf.variants.case) {
-            leaf.variants.case = new_case;
-        }
-    }
-    return node;
-}
-
-function cycle_nonterminal_category (forward, sel) {
+function cycle_nonterm_prefix (forward, sel) {
     let node = sel.start.node;
 
     let old = node.nonterminal;
-    let nt_name = node.nonterminal.split("-")[0];
+    let nt_prefix = node.nonterminal.split("-")[0];
     let new_item = array_cycle_next_elem(
-        NONTERMINAL_CYCLE,
-        nt_name,
+        ENUM.NONTERMS,
+        nt_prefix,
         forward
     );
 
@@ -437,13 +457,55 @@ function cycle_nonterminal_category (forward, sel) {
     return old !== new_item ? node : false;
 }
 
-function cycle_nonterminal_variant(forward, sel) {
+function cycle_nonterm_suffix(forward, sel) {
     let node = sel.start.node;
 
-    let nt_name = node.nonterminal.split("-")[0];
+    let nt_prefix = node.nonterminal.split("-")[0];
     let old = node.nonterminal;
     let new_item = array_cycle_next_elem(
-        NONTERMINAL_NAME_TO_CYCLE[nt_name],
+        ENUM.NONTERM_SUFFIX[nt_prefix],
+        old,
+        forward
+    );
+
+    node.nonterminal = new_item;
+    return old !== new_item ? node : false;
+}
+
+function cycle_nonterm_short_01(forward, sel) {
+    let node = sel.start.node;
+    console.log(sel);
+
+    let nt_prefix = node.nonterminal.split("-")[0];
+    let cycle = ENUM.SHORT_01[nt_prefix];
+    if (cycle === undefined || cycle === "") {
+        console.log("Skipping short_01 for", node.nonterminal);
+        return false;
+    }
+    let old = node.nonterminal;
+    let new_item = array_cycle_next_elem(
+        cycle,
+        old,
+        forward
+    );
+
+    node.nonterminal = new_item;
+    return old !== new_item ? node : false;
+}
+
+function cycle_nonterm_short_02(forward, sel) {
+    let node = sel.start.node;
+
+    let nt_prefix = node.nonterminal.split("-")[0];
+    let cycle = ENUM.SHORT_02[nt_prefix];
+    if (cycle === undefined || cycle === "") {
+        console.log("Skipping short_02 for", node.nonterminal);
+        return false;
+    }
+
+    let old = node.nonterminal;
+    let new_item = array_cycle_next_elem(
+        cycle,
         old,
         forward
     );
@@ -466,16 +528,16 @@ function array_cycle_next_elem(arr, curr_elem, forward) {
 function cycle_terminal_category (forward, sel) {
     let node = sel.start.node;
 
-    let old = node.terminal;
+    let old = node.cat;
     let new_item = array_cycle_next_elem(
-        TERMINAL_CYCLE,
+        ENUM.TERM,
         old,
         forward
     );
 
     node.cat = new_item;
-    let next_variants = CATEGORY_TO_VARIANT_NAMES[next_item];
-    for (var_name of TERMINAL_VARIANT_NAMES) {
+    let next_variants = ENUM.CAT_TO_VAR[node.cat];
+    for (var_name of Object.keys(ENUM.VAR)) {
         node.variants[name] = next_variants.indexOf(var_name) > 0 ? node.variants[name] : "";
     }
     node.terminal = terminal_to_flat_terminal(node);
@@ -528,8 +590,9 @@ function terminal_to_flat_terminal(terminal) {
         head = terminal.cat;
     }
     let tail = [];
-    if (CATEGORY_TO_VARIANT_NAMES[terminal.cat]) {
-        for (name of CATEGORY_TO_VARIANT_NAMES[terminal.cat]) {
+    let variant_names = ENUM.CAT_TO_VAR[terminal.cat];
+    if (variant_names) {
+        for (name of variant_names) {
             if (name === "obj1" || name === "obj2") {
                 // already inserted case control
                 continue;
@@ -552,7 +615,8 @@ function terminal_obj_to_dom_elem(obj) {
         text: obj.terminal
     };
 
-    for (name of TERMINAL_VARIANT_NAMES) {
+    let variant_names = Object.keys(ENUM.VAR);
+    for (name of variant_names) {
         attrs["data-" + name] = obj.variants[name];
     }
     attrs["data-cat"] = obj.cat;
@@ -651,7 +715,19 @@ function get_child_index_of_elem(elem) {
     ).indexOf(elem);
 }
 
-function traverse_path(node, path) {
+
+function traverse_elem_path(node, path) {
+    let cursor = node;
+    for (let child_index of path) {
+        let non_id_nodes = [... cursor.children].filter(
+            (child) => !arr_contains(child.classList, "tree-id-node")
+        );
+        cursor = non_id_nodes[child_index];
+    }
+    return cursor;
+}
+
+function traverse_node_path(node, path) {
     let cursor = node;
     for (let child_index of path) {
         cursor = cursor.children[child_index];
@@ -672,7 +748,7 @@ function get_rooted_node_by_elem (sel_elem) {
     let path_obj = get_path_to_root_elem(sel_elem);
     let root_node = dom_node_to_tree(path_obj.root);
     let path = path_obj.path;
-    let sel_node = traverse_path(root_node, path);
+    let sel_node = traverse_node_path(root_node, path);
 
     let rooted_node = {
         path: path_obj.path,
@@ -726,7 +802,8 @@ function dom_node_to_tree (elem) {
  */
 function dom_terminal_elem_to_obj(dom_node) {
     let variants = {};
-    for (name of TERMINAL_VARIANT_NAMES) {
+    let variant_names = Object.keys(ENUM.VAR);
+    for (name of variant_names) {
         variants[name] = dom_node.dataset[name];
     }
     let term_obj = {
@@ -775,54 +852,25 @@ function delete_subvariant_by_index (var_idx, sel) {
 function cycle_subvariant_by_variant_name (var_names, forward, sel) {
     let node = sel.start.node;
 
-    let var_name = var_names;
-    console.log("var_names:", var_names);
-    console.log("cat_var_names:", CATEGORY_TO_VARIANT_NAMES[node.cat]);
+    var_names = Array.isArray(var_names) ? var_names : [var_names];
+    let var_name = var_names.filter((name) =>
+                                ENUM.CAT_TO_VAR[node.cat].includes(name));
+    var_name = var_name ? var_name[0] : false;
 
-    if (Array.isArray(var_names)) {
-        var_name = var_names.filter((name) =>
-                                    CATEGORY_TO_VARIANT_NAMES[node.cat].includes(name));
-        var_name = var_name ? var_name[0] : false;
-    }
     if (!var_name) {
         console.log("skipping ", var_names, "for", node.cat)
         return false;
     }
 
-    console.log("var_name:", var_name);
-
     let old = node.variants[var_name];
+    let cycle = ENUM.VAR[var_name];
     let new_item = array_cycle_next_elem(
-        VARIANT_NAME_TO_SUBVARIANTS[var_name],
-        node.variants[var_name],
+        cycle,
+        old,
         forward
     );
     node.variants[var_name] = new_item
 
-    node.terminal = terminal_to_flat_terminal(node);
-
-    return old !== new_item ? node : false;
-}
-
-function cycle_subvariant_by_variant_index (var_idx, forward, sel) {
-    let node = sel.start.node;
-    if (!node || !node.terminal) {
-        return false;
-    }
-
-    if (var_idx < 0 || !CATEGORY_TO_VARIANT_NAMES[node.cat] || CATEGORY_TO_VARIANT_NAMES[node.cat].length <= var_idx) {
-        console.log(`Illegal index '${var_idx}' on ${CATEGORY_TO_VARIANT_NAMES[node.cat]}`);
-        return false;
-    }
-
-    let var_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
-    let old = node.variants[var_name];
-    let new_item = array_cycle_next_elem(
-        VARIANT_NAME_TO_SUBVARIANTS[var_name],
-        node.variants[var_name],
-        forward
-    );
-    node.variants[var_name] = new_item;
     node.terminal = terminal_to_flat_terminal(node);
 
     return old !== new_item ? node : false;
@@ -834,17 +882,17 @@ function cycle_subvariant_by_variant_index (var_idx, forward, sel) {
 function insert_nonterminal(sel) {
     console.log("inserting terminal");
     let node = sel.start.node;
-    let out_name = undefined;
+    let new_parent_name = undefined;
 
     if (node.terminal) {
-        out_name = TERMINAL_CAT_TO_NONTERMINAL[node.cat];
+        new_parent_name = ENUM.DEFAULT_PARENT[node.cat];
     } else {
-        let cat = node.nonterminal.split("-")[0];
-        out_name = NONTERMINAL_CAT_TO_NONTERMINAL[cat];
+        let nt_prefix = node.nonterminal.split("-")[0];
+        new_parent_name = ENUM.DEFAULT_PARENT[nt_prefix];
     }
 
     let new_node = {
-        nonterminal: out_name,
+        nonterminal: new_parent_name,
         children: [],
     };
     let prev_parent = node.parent;
@@ -949,7 +997,7 @@ function undoable_dom_swap(sel) {
  */
 function mk_undoable (effectful_fn) {
     function new_fn (selection) {
-        let DEBUG = 1;
+        let DEBUG = 0;
         let new_args = [].concat([...arguments]);
 
         DEBUG && console.log("new_args", new_args);
@@ -966,6 +1014,7 @@ function mk_undoable (effectful_fn) {
         let root_elem_in = selection.start.root_elem;
         let root_elem_out = tree_to_dom_elem(selection.start.root_node);
         root_elem_out.id = root_elem_in.id;
+        root_elem_out.dataset["tree_id"] = selection.start.root_node.tree_id;
 
         // use legacy undo system defined in treedrawing.js
         undoBeginTransaction();
@@ -973,10 +1022,8 @@ function mk_undoable (effectful_fn) {
         $(root_elem_in).replaceWith($(root_elem_out));
         undoEndTransaction();
 
-        // TODO: walk to root from result instead
-        let effected_elem = traverse_path(root_elem_out, selection.start.path)
+        let effected_elem = traverse_elem_path(root_elem_out, selection.start.path);
 
-        // TODO: loop over siblings when appropriate?
         $(effected_elem).addClass("snodesel");
         startnode = effected_elem;
 
@@ -1070,8 +1117,8 @@ let root_example = {
 function populate_context_menu_nonterminal(sel) {
     let node = sel.start.node;
     let cat = node.nonterminal.split("-")[0];
-    let names = [... NONTERMINAL_CYCLE];
-    let extensions = NONTERMINAL_NAME_TO_CYCLE[cat] || [];
+    let names = [... ENUM.NONTERMS];
+    let extensions = ENUM.NONTERM_SUFFIX[cat] || [];
 
     function make_item(suggestion) {
         let attrs = {
@@ -1115,7 +1162,7 @@ function populate_context_menu_terminal(sel) {
     let node = sel.start.node;
     let name = node.cat;
     let curr_flat_term = node.terminal;
-    let names = [... TERMINAL_CYCLE];
+    let names = [... ENUM.TERM];
     /*
       bin feature
       fetch bin candidates for terminal, BIN_CANDIDATES[tree_id][leaf_idx]
@@ -1217,8 +1264,8 @@ function insert_style_rule(rule) {
         /*
           actions on nonterminals
         */
-        // cycle_nonterminal_category(dom_s_ref);
-        // cycle_nonterminal_variant(dom_s_ref);
+        // cycle_nonterm_prefix(dom_s_ref);
+        // cycle_nonterm_suffix(dom_s_ref);
 
     }, 500);
 })();
@@ -1233,37 +1280,37 @@ function customCommands() {
     // addCommand({ keycode: KEYS["1"]}, with_sel_singular({
     //     // TODO: _op
     //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
-    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, FORWARD)),
     // }));
     // addCommand({ keycode: KEYS["1"], shift: true}, with_sel_singular({
     //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
-    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, BACKWARD)),
     // }));
     // addCommand({ keycode: KEYS["2"]}, with_sel_singular({
     //     // TODO: _subj_fall ?
     //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
-    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, FORWARD)),
     // }));
     // addCommand({ keycode: KEYS["2"], shift: true}, with_sel_singular({
     //     terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
-    //     nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+    //     nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, BACKWARD)),
     // }));
 
     addCommand({ keycode: KEYS.Q}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, FORWARD)),
     }));
     addCommand({ keycode: KEYS.Q, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_variant.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, BACKWARD)),
     }));
     addCommand({ keycode: KEYS.W}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", FORWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_1, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.W, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", BACKWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_1, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.E}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], FORWARD)),
@@ -1284,11 +1331,11 @@ function customCommands() {
     }));
     addCommand({ keycode: KEYS.T}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_2, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.T, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", BACKWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_S_CYCLE_2, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
 
     addCommand({ keycode: KEYS.X}, with_sel(mk_undoable(insert_nonterminal)));
@@ -1307,29 +1354,30 @@ function customCommands() {
 
     addCommand({ keycode: KEYS.S}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", FORWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_1, FORWARD)),
+        // nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_1, FORWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.S, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", BACKWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_1, BACKWARD)),
+        // nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_1, BACKWARD)),
+        nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.D}, with_sel_singular({
         // TODO: subj_case
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", FORWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_2, FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterm_short_02.bind(null, FORWARD)),
     }));
     addCommand({ keycode: KEYS.D, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", BACKWARD)),
-        nonterminal: mk_undoable(make_nonterminal_cycle_fn(SHORT_NP_CYCLE_2, BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterm_short_02.bind(null, BACKWARD)),
     }));
     addCommand({ keycode: KEYS.F}, with_sel_singular({
-        // TODO: gender
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_category.bind(null, FORWARD)),
+        nonterminal: mk_undoable(cycle_nonterm_short_01.bind(null, FORWARD)),
     }));
     addCommand({ keycode: KEYS.F, shift: true}, with_sel_singular({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterminal_category.bind(null, BACKWARD)),
+        nonterminal: mk_undoable(cycle_nonterm_short_01.bind(null, BACKWARD)),
     }));
 
     addCommand({ keycode: KEYS.C}, with_sel_singular({
