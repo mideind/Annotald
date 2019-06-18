@@ -373,43 +373,38 @@ body {
 }
 
 .nonterminal-adjp {
-    background: #9cd8c8;
-    border-left: 4px solid #9cd8c8;
+    background: #7de0ac;
+    border-left: 4px solid #4da08c;
 }
 
 .nonterminal-advp {
-    background: #bcd8ac;
+    background: #bce09c;
     border-left: 4px solid #3a963a;
 }
 
-.nonterminal-cp {
-    background: #f00;
-    border-left: 4px solid #900;
-}
-
-.nonterminal-c {
-    background: #f00;
-    border-left: 4px solid #900;
-}
-
 .nonterminal-dateabs {
-    background: #f00;
-    border-left: 4px solid #900;
+    background: #bce09c;
+    border-left: 4px solid #3a963a;
 }
 
 .nonterminal-daterel {
-    background: #f00;
-    border-left: 4px solid #900;
-}
-
-.nonterminal-inf {
-    background: #f00;
-    border-left: 4px solid #900;
+    background: #bce09c;
+    border-left: 4px solid #3a963a;
 }
 
 div.nonterminal-ip {
-    background: #f0dd9b;
+    background: #ffe59c;
     border-left: 4px solid #bc9f3c;
+}
+
+.nonterminal-cp {
+    background: #ffd077;
+    border-left: 4px solid #b57b3c;
+}
+
+.nonterminal-c {
+    background: #ffd57c;
+    border-left: 4px solid #b57b3c;
 }
 
 .nonterminal-np {
@@ -418,8 +413,8 @@ div.nonterminal-ip {
 }
 
 .nonterminal-p {
-    background: #f00;
-    border-left: 4px solid #900;
+    background: #ac96cb;
+    border-left: 4px solid #935093;
 }
 
 .nonterminal-pp {
@@ -442,6 +437,11 @@ div.nonterminal-s0 {
     border-left: 4px solid #b7312d;
 }
 
+.nonterminal-inf {
+    background: #ffa19d;
+    border-left: 4px solid #b7312d;
+}
+
 /* Greynir terminal styling */
 
 .terminal-fs {
@@ -455,63 +455,68 @@ div.nonterminal-s0 {
 }
 
 .terminal-no {
-    background: #a8cdff;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-sérnafn {
-    background: #a8cdff;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-person {
-    background: #a8cdff;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-entity {
-    background: #a8cdff;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-abfn {
-    background: #8de5ef;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-fn {
-    background: #8de5ef;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-pfn {
-    background: #8de5ef;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-töl {
-    background: #8de5ef;
+    background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
 .terminal-ao {
-    background: #bffaaf;
+    background: #bffa90;
     border-left: 4px solid #3a963a;
 }
 
-.terminal-lo {
-    background: #bffaaf;
-    border-left: 4px solid #3a963a;
-}
-
-.terminal-to {
-    background: #bffaaf;
+.terminal-tao {
+    background: #bffa90;
     border-left: 4px solid #3a963a;
 }
 
 .terminal-eo {
-    background: #bffaaf;
+    background: #bffa90;
     border-left: 4px solid #3a963a;
+}
+
+.terminal-lo {
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
+}
+
+.terminal-to {
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
 }
 
 .terminal-ártal {
