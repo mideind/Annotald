@@ -422,14 +422,19 @@ div.nonterminal-ip {
     border-left: 4px solid #935093;
 }
 
-div.nonterminal-s {
+.nonterminal-s {
     background: #f2ac7c;
     border-left: 4px solid #b57b3c;
 }
 
-div.nonterminal-s0 {
+.nonterminal-s0 {
     background: #ccc;
     border-left: 4px solid #443944;
+}
+
+.nonterminal-foreign {
+    background: #ccc;
+    border-left: 4px solid #777;
 }
 
 .nonterminal-vp {
@@ -547,6 +552,11 @@ div.nonterminal-s0 {
 .terminal-\. {
     background: #ccc;
     border-left: 4px solid #443944;
+}
+
+.terminal-foreign {
+    background: #e8e8e8;
+    border-left: 4px solid #777;
 }
 
 .terminal-prósenta {
