@@ -154,10 +154,10 @@ class Treedraw(object):
                     escaped_lemma = util.escape_parens(tree_dict["lemma"])
                     children.append(AnnoTree("lemma", [escaped_lemma]))
                 if "seg" in tree_dict and tree_dict["seg"]:
-                    escaped_seg = util.escape_parens(tree_dict["lemma"])
+                    escaped_seg = util.escape_parens(tree_dict["seg"])
                     children.append(AnnoTree("exp_seg", [escaped_seg]))
                 elif "abbrev" in tree_dict and tree_dict["abbrev"]:
-                    escaped_abbrev = util.escape_parens(tree_dict["lemma"])
+                    escaped_abbrev = util.escape_parens(tree_dict["abbrev"])
                     children.append(AnnoTree("exp_abbrev", [escaped_abbrev]))
 
                 node = AnnoTree(flat_terminal, children)

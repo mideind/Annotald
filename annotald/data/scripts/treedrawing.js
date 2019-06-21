@@ -76,6 +76,7 @@
  * @type Node
  */
 var startnode = null;
+var last_startnode = null;
 /**
  * This variable holds the "end" node if multiple selection is in effect.
  * Otherwise undefined.
@@ -143,6 +144,7 @@ function assignEvents() {
     customCommands();
     document.body.onkeydown = handleKeyDown;
     $("#sn0").mousedown(handleNodeClick);
+    $("#sn0").dblclick(handleNodeDoubleClick);
     document.body.onmouseup = killTextSelection;
     $("#butsave").mousedown(save);
     $("#butundo").mousedown(undo);
@@ -359,9 +361,31 @@ function addClickHook(fn) {
     clickHooks.push(fn);
 }
 
+let prev_startnode = null;
+
+/* If last clicked element was a wnode node, this points to it, otherwise null */
+let last_wnode = null;
+/* Guard against double single clicks, jQuery or the browser does not natively suppress
+   the second single click when the dblclick event fires */
+let clicks = 0;
+const CLICK_INTERVAL_MILLISECS = 400;
+
 function handleNodeClick(e) {
+    if (clicks > 0) {
+        e.preventDefault();
+        return true;
+    }
+    clicks++;
+    setTimeout(function () { clicks = 0;}, CLICK_INTERVAL_MILLISECS);
+
     e = e || window.event;
-    var element = (e.target || e.srcElement);
+    let element = (e.target || e.srcElement);
+    if (element.classList && [... element.classList].includes("wnode")) {
+        last_wnode = element;
+    } else {
+        last_wnode = null;
+    }
+
     saveMetadata();
     if (e.button == MOUSE.RIGHT_BUTTON) {
         if (startnode && !endnode) {
@@ -386,17 +410,12 @@ function handleNodeClick(e) {
                                 // selection in the browser...
         } else {
             selectNode(element);
-            if (e.ctrlKey) {
-                makeNode("XP");
-            }
         }
     } else if (e.button == MOUSE.MIDDLE_BUTTON) {
-        let sel = get_selection();
-        if (!sel) {
-            selectNode(element);
-            sel = get_selection();
-        }
-        console.log("mouse button3!");
+        clearSelection();
+        selectNode(element);
+        wrapped_insert_nonterminal(get_selection());
+
     }
     _.each(clickHooks, function (fn) {
         fn(e.button);
@@ -404,6 +423,46 @@ function handleNodeClick(e) {
     e.stopPropagation();
     last_event_was_mouse = true;
     undoBarrier();
+}
+
+function handleNodeDoubleClick(ev) {
+    let event = ev || window.event;
+    let element = (event.target || event.srcElement);
+
+    if (last_wnode !== element) {
+        return true;
+    }
+
+    clearSelection();
+    selectNode(last_wnode);
+    let sel = get_selection();
+
+    let node = sel.start.node;
+
+    if (!node.lemma || node.lemma === "") {
+        console.error("double click handle on unexpected object", sel);
+    }
+
+    if (element.classList && [... element.classList].includes("lemma-node")) {
+        let res = window.prompt("Lemma", node.lemma);
+        if (res  && res !== "" && res !== node.lemma) {
+            node.lemma = res;
+            undoable_dom_swap(sel);
+        }
+    } else if (element.classList && [... element.classList].includes("exp-abbrev-node")) {
+        let res = window.prompt("Expanded abbreviation", node.abbrev);
+        if (res  && res !== "" && res !== node.abbrev) {
+            node.abbrev = res;
+            undoable_dom_swap(sel);
+        }
+        console.log("handleNodeDoubleClick: edit abbrev");
+    } else if (element.classList && [... element.classList].includes("exp-seg-node")) {
+        let res = window.prompt("Expanded word segmentation", node.seg);
+        if (res  && res !== "" && res !== node.seg) {
+            node.lemma = res;
+            undoable_dom_swap(sel);
+        }
+    }
 }
 
 // ========== Context Menu
@@ -431,10 +490,6 @@ function showContextMenu(e) {
         conr = $("#conRight"),
         conrr = $("#conRightest"),
         conm = $("#conMenu");
-
-    conl.empty();
-
-    // loadContextMenu(element);
 
     $("#conMenu .conMenuColumn").each((idx) => { $(this).height("auto")});
     let max_height = _.max($("#conMenu .conMenuColumn"), () => $(this).height());
@@ -524,80 +579,92 @@ function setInputFieldEnter(field, fn) {
 // ========== Selection
 
 /**
+ * Get terminal or nonterminal element that is the immediate parent of elem
+ */
+function get_selected_node_elem(elem) {
+    if (!elem) {
+        return false;
+    }
+
+    if (!(elem instanceof Node)) {
+        console.err("Selecting a non-node");
+    }
+    if (elem == document.getElementById("sn0")) {
+        clearSelection();
+        return false;
+    }
+
+    while (!$(elem).hasClass("snode") && elem != document) {
+        elem = elem.parentNode;
+    }
+
+    return elem;
+}
+
+/**
  * Select a node, and update the GUI to reflect that.
  *
  * @param {Node} node the node to be selected
  * @param {Boolean} force if true, force this node to be a secondary
  * selection, even if it wouldn't otherwise be.
  */
-function selectNode(node, force) {
-    if (node) {
-        if (!(node instanceof Node)) {
-            try {
-                throw Error("foo");
-            } catch (e) {
-                console.log("selecting a non-node: " + e.stack);
-            }
-        }
-        if (node == document.getElementById("sn0")) {
-            clearSelection();
-            return;
-        }
+function selectNode(sel_node, force) {
+    sel_node = get_selected_node_elem(sel_node);
+    if (!sel_node) {
+        return false;
+    }
+    let curr_startnode = startnode;
 
-        while (!$(node).hasClass("snode") && node != document) {
-            node = node.parentNode;
+    if (startnode === null) {
+        // no current selection
+        startnode = sel_node;
+    } else if (sel_node == startnode) {
+        // deselect first node
+        startnode = null;
+        if (endnode) {
+            startnode = endnode;
+            endnode = null;
         }
-
-        if (startnode === null) {
-            // no current selection
-            startnode = node;
-        } else if (node == startnode) {
-            // deselect first node
-            startnode = null;
-            if (endnode) {
-                startnode = endnode;
+    } else {
+        if (startnode && (last_event_was_mouse || force)) {
+            // current selection exists
+            if (sel_node == endnode) {
+                // deselect last node
                 endnode = null;
-            }
-        } else {
-            if (startnode && (last_event_was_mouse || force)) {
-                // current selection exists
-                if (node == endnode) {
-                    // deselect last node
-                    endnode = null;
-                } else if (endnode) {
-                    // current selection is many siblings, either end was not selected
+            } else if (endnode) {
+                // current selection is many siblings, either end was not selected
+                startnode = null;
+                endnode = null;
+            } else {
+                // startnode exists, new node selected
+                // enforce start and end nodes are siblings and make start point to leftmost sibling
+                let parent_children = [...startnode.parentElement.children];
+                let is_parent_inside_tree = startnode.parentElement.id !== "sn0";
+                if ( parent_children.includes(sel_node) && is_parent_inside_tree ) {
+                    let child_idx_startnode = parent_children.indexOf(startnode);
+                    let child_idx_sel = parent_children.indexOf(sel_node);
+                    let startnode_ = child_idx_startnode < child_idx_sel ? startnode : sel_node;
+                    let endnode_ = child_idx_startnode < child_idx_sel ? sel_node : startnode;
+                    startnode = startnode_;
+                    endnode = endnode_;
+                } else {
+                    // startnode exists, but new node was not a sibling
                     startnode = null;
                     endnode = null;
-                } else {
-                    // startnode exists, new node selected
-                    let parent_children = [...startnode.parentElement.children];
-                    let is_parent_inside_tree = startnode.parentElement.id !== "sn0";
-                    if ( parent_children.includes(node) && is_parent_inside_tree ) {
-                        let child_idx_start = parent_children.indexOf(startnode);
-                        let child_idx_end = parent_children.indexOf(node);
-                        let startnode_ = child_idx_start < child_idx_end ? startnode : node;
-                        let endnode_ = child_idx_start < child_idx_end ? node : startnode;
-                        startnode = startnode_;
-                        endnode = endnode_;
-                    } else {
-                        // startnode exists, but new node was not a sibling
-                        startnode = null;
-                        endnode = null;
-                    }
-               }
-            } else {
-                endnode = null;
-                startnode = node;
+                }
             }
-        }
-        updateSelection();
-    } else {
-        try {
-            throw Error("foo");
-        } catch (e) {
-            console.log("tried to select something falsey: " + e.stack);
+        } else {
+            endnode = null;
+            startnode = sel_node;
         }
     }
+    if (last_startnode === null) {
+        last_startnode = startnode ? startnode : last_startnode;
+        last_startnode = curr_startnode ? curr_startnode : last_startnode;
+    } else {
+        last_startnode = curr_startnode ? curr_startnode : last_startnode;
+    }
+    updateSelection();
 }
 
 /**
@@ -606,7 +673,8 @@ function selectNode(node, force) {
 function clearSelection() {
     saveMetadata();
     window.event.preventDefault();
-    startnode = endnode = null;
+    startnode = null;
+    endnode = null;
     updateSelection();
     hideContextMenu();
 }
@@ -632,8 +700,6 @@ function updateSelection() {
 }
 
 function updateUrtext(sel) {
-    console.log(sel)
-    // debugger;
     if (sel.start) {
         let text = tree_to_text(sel.start.root_node);
         $("#urtext").text(text).show();
@@ -2241,91 +2307,15 @@ function coIndex() {
 
 // =============== Save helper function
 
-// TODO: move to utils?
-// TODO: this is not very general, in fact only works when called with
-// #editpane as arg
-function toLabeledBrackets(node) {
-    var out = node.clone();
-
-    // The ZZZZZ is a placeholder; first we want to clean any
-    // double-linebreaks from the output (which will be spurious), then we
-    // will turn the Z's into double-linebreaks
-    out.find(".snode:not(#sn0)").each(function () {
-        this.insertBefore(document.createTextNode("("), this.firstChild);
-        this.appendChild(document.createTextNode(")"));
-    });
-
-    out.find("#sn0>.snode").each(function () {
-        $(this).append(jsonToTree(this.getAttribute("data-metadata")));
-        this.insertBefore(document.createTextNode("( "), this.firstChild);
-        this.appendChild(document.createTextNode(")ZZZZZ"));
-    });
-
-    out.find(".wnode").each(function () {
-        this.insertBefore(document.createTextNode(" "), this.firstChild);
-    });
-
-    out = out.text();
-    // Must use rx for string replace bc using a string doesn't get a
-    // global replace.
-    out = out.replace(/\)\(/g, ") (");
-    out = out.replace(/  +/g, " ");
-    out = out.replace(/\n\n+/g,"\n");
-    out = out.replace(/ZZZZZ/g, "\n\n");
-    // If there is a space after the word but before the closing paren, it
-    // will make CorpusSearch unhappy.
-    out = out.replace(/ +\)/g, ")");
-    // Ditto for spaces btw. word and lemma, in dash format
-    out = out.replace(/- +/g, "-");
-
-
-    return out;
-}
-
-var saveInProgress = false;
-
-function saveHandler (data) {
-    if (data.result == "success") {
-        displayInfo("Save success.");
-    } else {
-        lastsavedstate = "";
-        var extraInfo = "";
-        if (safeGet(data, 'reasonCode', 0) == 1) {
-            extraInfo = " <a href='#' id='forceSave' " +
-                "onclick='javascript:startTime=" + data.startTime +
-                ";save(null, {force:true});return false'>Force save</a>";
-        } else if (safeGet(data, 'reasonCode', 0) == 2) {
-            extraInfo = " <a href='#' id='forceSave' " +
-                "onclick='javascript:startTime=" + data.startTime +
-                ";save(null, {update_md5:true});return false'>Force save</a>";
-        }
-        displayError("Save FAILED!!!: " + data.reason + extraInfo);
-    }
-    saveInProgress = false;
-}
-
-// function logEvent(type, data) {
-//     data = data || {};
-//     data.type = type;
-//     payload = { eventData: data };
-//     $.ajax({
-//         url: "/doLogEvent",
-//         async: true,
-//         dataType: "json",
-//         type: "POST",
-//         data: JSON.stringify(payload),
-//         contentType : "application/json",
-//         traditional: true
-//     });
-// }
+var is_save_in_progress = false;
 
 function save(e) {
     let trees = get_all_trees();
     let data = {trees: trees};
-    console.log(trees);
-    if (!saveInProgress) {
+    console.log("saved", trees);
+    if (!is_save_in_progress) {
         displayInfo("Saving...");
-        saveInProgress = true;
+        is_save_in_progress = true;
         setTimeout(function () {
             $.ajax({
                 type: "POST",
@@ -2344,7 +2334,7 @@ function save(e) {
                     console.error(args);
                 },
                 complete: function (args) {
-                    saveInProgress = false;
+                    is_save_in_progress = false;
                 }
             });
         }, 0);
