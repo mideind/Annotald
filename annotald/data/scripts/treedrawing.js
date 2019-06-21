@@ -370,6 +370,162 @@ let last_wnode = null;
 let clicks = 0;
 const CLICK_INTERVAL_MILLISECS = 400;
 
+function move_node(el) {
+    let curr_sel = get_selection().start;
+    let tgt_sel = get_rooted_node_by_elem(el);
+
+    if (curr_sel.root_node.tree_id !== tgt_sel.root_node.tree_id) {
+        return;
+    }
+    let curr_path = curr_sel.path;
+    let tgt_path = tgt_sel.path;
+
+    // check if curr is immediate right sibling tgt
+    if (curr_path.length === tgt_path.length) {
+        let is_sibling = true;
+        for (let i=0; i < tgt_path.length - 1; i++) {
+            if (tgt_path[i] !== curr_path[i]) {
+                is_sibling = false;
+                break;
+            }
+        }
+        if (is_sibling && tgt_sel.node.nonterminal) {
+            let curr_idx = curr_path[curr_path.length - 1];
+            let tgt_idx = tgt_path[tgt_path.length - 1];
+            if (curr_idx === (tgt_idx + 1)) {
+                console.log("curr is immediate right sibling of tgt")
+                // let curr = tgt_sel.node.parent.children[]
+                let curr = curr_sel.node.parent.children[curr_idx];
+                tgt_sel.node.parent.children.splice(curr_idx, 1);
+                tgt_sel.node.children.push(curr);
+
+                undoable_dom_swap({start: tgt_sel});
+                clearSelection();
+                return;
+            } else {
+                console.log("tgt is neither an ancestor of curr greater than parent, nor a nonterminal left sibling of curr");
+                return;
+            }
+        } else {
+            console.log("tgt is neither an ancestor of curr greater than parent, nor a left sibling of curr");
+            return;
+        }
+    } else if (curr_path.length - 2 < tgt_path.length){
+        // check if tgt is an ancestor of curr, at least grandparent
+        console.log("path to short compared to tgt", tgt_path.length, curr_path.length);
+        return;
+    }
+    for (let i=0; i < tgt_path.length; i++) {
+        if (tgt_path[i] !== curr_path[i]) {
+            console.log("tgt is not ancestor of curr");
+            return;
+        }
+    }
+
+    // curr must be a rightmost descendant of an immediate child of tgt
+    let tgt_depth = tgt_path.length - 1;
+    let runner = tgt_sel.node.children[curr_path[tgt_depth + 1]];
+    // console.log("starting rightmost check at", runner.nonterminal)
+    for (let path_idx=tgt_depth + 2; path_idx < curr_path.length; path_idx++) {
+        let child_idx = curr_path[path_idx];
+        if (runner.children.length > child_idx + 1) {
+            console.log("intermediate ancestor is not rightmost child", runner.nonterminal || runner.terminal);
+            return;
+        }
+        runner = runner.children[child_idx];
+    }
+    // console.log("ending rightmost check at", runner.nonterminal || runner.terminal)
+
+    function traverse_move_prune(node, path) {
+
+        function traverse_move_prune_inner(node, is_on_path, path, is_root) {
+            if (!node.children) {
+                return {
+                    node: is_on_path ? null : node,
+                    move: is_on_path ? node : null,
+                };
+            }
+
+            let new_children = [];
+            if (!is_on_path) {
+                return {
+                    node: node,
+                    move: null,
+                };
+            }
+
+            if (path.length === 0) {
+                // node is selected, is nonterminal
+                return {
+                    node: null,
+                    move: node,
+                };
+            }
+
+            let new_path = path.slice(1);
+
+            if (node.children.length === 1) {
+                let result = traverse_move_prune_inner(node.children[0], is_on_path, new_path, false);
+                node.children = [];
+                if (result.node && !result.move) {
+                    node.children = [result.node];
+                    return {
+                        node: node,
+                        move: null,
+                    };
+                } else if (result.move && !result.node) {
+                    return {
+                        node: null,
+                        move: result.move,
+                    };
+                } else if (result.node && result.move) {
+                    node.children = [result.node];
+                    if (is_root) {
+                        node.children.push(result.move);
+                    }
+                    return {
+                        node: node,
+                        move: is_root ? null : result.move,
+                    };
+                } else {
+                    console.error("unreachable", node.nonterminal);
+                }
+            }
+
+            let sel_idx = path[0];
+            let move = null;
+
+            for (let idx = 0; idx < node.children.length; idx++) {
+                let child = node.children[idx];
+                let result = traverse_move_prune_inner(child, sel_idx === idx, new_path, false)
+                if (result.node) {
+                    new_children.push(result.node);
+                }
+                if (is_root && result.move) {
+                    new_children.push(result.move);
+                } else {
+                    move = result.move ? result.move : move;
+                }
+            }
+
+            node.children = new_children;
+
+            return {
+                node: node,
+                move: move,
+            };
+        }
+
+        let result = traverse_move_prune_inner(node, true, path, true);
+        return result.node ? result.node : result.move;
+    }
+
+    let path_from_tgt = [... curr_path].slice(tgt_path.length);
+    let pruned_tgt = traverse_move_prune(tgt_sel.node, path_from_tgt);
+    undoable_dom_swap({start: tgt_sel});
+    clearSelection();
+}
+
 function handleNodeClick(e) {
     if (clicks > 0) {
         e.preventDefault();
@@ -391,13 +547,15 @@ function handleNodeClick(e) {
         if (startnode && !endnode) {
             if (startnode != element) {
                 e.stopPropagation();
-                moveNode(element);
+                move_node(element);
+                // moveNode(element);
             } else {
                 showContextMenu(e);
             }
         } else if (startnode && endnode) {
             e.stopPropagation();
-            moveNodes(element);
+            // moveNodes(element);
+            move_node(element);
         } else {
             selectNode(element, true);
             showContextMenu(e);
