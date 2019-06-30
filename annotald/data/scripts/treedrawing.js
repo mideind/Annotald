@@ -371,157 +371,149 @@ let clicks = 0;
 const CLICK_INTERVAL_MILLISECS = 400;
 
 function move_node(el) {
+    function traverse_prune(node, path) {
+        if (path.length == 0) {
+            return {
+                sel_node: node,
+                should_prune: true,
+            };
+        }
+        let new_path = path.slice(1);
+        let child_idx = path[0];
+        let result = traverse_prune(node.children[child_idx], new_path);
+
+        let did_prune = false;
+        if (result.should_prune) {
+            node.children.splice(child_idx, 1);
+            did_prune = true;
+        }
+
+        return {
+            should_prune: node.children.length === 0,
+            sel_node: result.sel_node,
+            did_prune: did_prune,
+        };
+    }
+
+    function insert_node(node, path, new_node, insert_left) {
+        if (path.length > 0) {
+            let child_idx = path[0];
+            let new_path = path.slice(1);
+            return insert_node(node.children[child_idx], new_path, new_node, insert_left);
+        }
+        if (insert_left) {
+            node.children.unshift(new_node);
+        } else {
+            node.children.push(new_node);
+        }
+        return true;
+    }
+
+    function hugs_right(node, path, ignore_first) {
+        if (path.length === 0)
+            return true;
+        let child_idx = path[0];
+        if (ignore_first) {
+            return hugs_right(node.children[child_idx], path.slice(1), false);
+        }
+        if (child_idx === (node.children.length - 1)) {
+            return hugs_right(node.children[child_idx], path.slice(1), false);
+        }
+        return false;
+    }
+
+    function hugs_left(node, path, ignore_first) {
+        if (path.length === 0)
+            return true;
+        let child_idx = path[0];
+        if (ignore_first) {
+            return hugs_left(node.children[child_idx], path.slice(1), false);
+        }
+        if (child_idx === 0) {
+            return hugs_left(node.children[child_idx], path.slice(1), false);
+        }
+        return false;
+
+    }
+
     let curr_sel = get_selection().start;
-    let tgt_sel = get_rooted_node_by_elem(el);
+    let tgt_sel = get_rooted_node_by_elem(el);  // fresh clone
+    if (tgt_sel.node.terminal) {
+        tgt_sel.path.pop();
+        tgt_sel.node = tgt_sel.node.parent;
+    }
+    let sel_path = curr_sel.path;
+    let tgt_path = tgt_sel.path;
 
     if (curr_sel.root_node.tree_id !== tgt_sel.root_node.tree_id) {
         return;
     }
-    let curr_path = curr_sel.path;
-    let tgt_path = tgt_sel.path;
 
-    // check if curr is immediate right sibling tgt
-    if (curr_path.length === tgt_path.length) {
-        let is_sibling = true;
-        for (let i=0; i < tgt_path.length - 1; i++) {
-            if (tgt_path[i] !== curr_path[i]) {
-                is_sibling = false;
-                break;
-            }
-        }
-        if (is_sibling && tgt_sel.node.nonterminal) {
-            let curr_idx = curr_path[curr_path.length - 1];
-            let tgt_idx = tgt_path[tgt_path.length - 1];
-            if (curr_idx === (tgt_idx + 1)) {
-                console.log("curr is immediate right sibling of tgt")
-                // let curr = tgt_sel.node.parent.children[]
-                let curr = curr_sel.node.parent.children[curr_idx];
-                tgt_sel.node.parent.children.splice(curr_idx, 1);
-                tgt_sel.node.children.push(curr);
+    let prefix_len = 0;
+    let max_len = Math.min(sel_path.length, tgt_path.length);
+    while (prefix_len <= max_len && sel_path[prefix_len] === tgt_path[prefix_len]) {
+        prefix_len++;
+    }
+    let common_path = sel_path.slice(0, prefix_len);
+    let common_anc = traverse_node_path(tgt_sel.root_node, common_path);
 
-                undoable_dom_swap({start: tgt_sel});
-                clearSelection();
-                return;
-            } else {
-                console.log("tgt is neither an ancestor of curr greater than parent, nor a nonterminal left sibling of curr");
-                return;
-            }
+    let prune_path = [... sel_path].slice(prefix_len);
+    let insert_path = [... tgt_path].slice(prefix_len);
+
+    if (prune_path.length === 0) {
+        // something strange
+        return true;
+    }
+
+    let prune_right = hugs_right(common_anc, prune_path, true);
+    let prune_left = hugs_left(common_anc, prune_path, true);
+    let insert_right = insert_path.length > 0 && hugs_right(common_anc, insert_path, true);
+    let insert_left = insert_path.length > 0 && hugs_left(common_anc, insert_path, true);
+
+    if (insert_path.length > 0 && !insert_right && !insert_left) {
+        // something strange, path hugs neither, cannot insert in between unless moving to parent
+        return true;
+    } else if (insert_path.length === 0 && prune_path.length < 2) {
+        // moving to immediate parent, but node is already there
+        return true;
+    } else if (insert_path.length > 0 && Math.abs(prune_path[0] - insert_path[0]) !== 1) {
+        // moving between distant siblings
+        return true;
+    }
+
+    let result = traverse_prune(common_anc, prune_path);
+
+    if (insert_path.length === 0) {
+        // moving to common ancestor
+        if (result.did_prune) {
+            // insert in same place as top level of prune path
+            // we do not delete in splice, since it was already pruned
+            common_anc.children.splice(prune_path[0], 0, result.sel_node);
         } else {
-            console.log("tgt is neither an ancestor of curr greater than parent, nor a left sibling of curr");
-            return;
+            // insert on same side as prune hug
+            let delta = prune_left ? 0 : 1;
+            common_anc.children.splice(prune_path[0] + delta, 0, result.sel_node);
         }
-    } else if (curr_path.length - 2 < tgt_path.length){
-        // check if tgt is an ancestor of curr, at least grandparent
-        console.log("path to short compared to tgt", tgt_path.length, curr_path.length);
-        return;
-    }
-    for (let i=0; i < tgt_path.length; i++) {
-        if (tgt_path[i] !== curr_path[i]) {
-            console.log("tgt is not ancestor of curr");
-            return;
+    } else {
+        // top level of prune_path and insert_path must be immediate siblings
+        // is_right_move must match prune hug
+        let is_right_move = prune_path[0] < insert_path[0];
+        if (!(is_right_move && prune_right) && !(!is_right_move && prune_left)) {
+            return true;
         }
-    }
-
-    // curr must be a rightmost descendant of an immediate child of tgt
-    let tgt_depth = tgt_path.length - 1;
-    let runner = tgt_sel.node.children[curr_path[tgt_depth + 1]];
-    // console.log("starting rightmost check at", runner.nonterminal)
-    for (let path_idx=tgt_depth + 2; path_idx < curr_path.length; path_idx++) {
-        let child_idx = curr_path[path_idx];
-        if (runner.children.length > child_idx + 1) {
-            console.log("intermediate ancestor is not rightmost child", runner.nonterminal || runner.terminal);
-            return;
+        let translated_insert_path = [... insert_path];
+        if (result.did_prune && is_right_move) {
+            translated_insert_path[0] = translated_insert_path[0] - 1;
         }
-        runner = runner.children[child_idx];
-    }
-    // console.log("ending rightmost check at", runner.nonterminal || runner.terminal)
-
-    function traverse_move_prune(node, path) {
-
-        function traverse_move_prune_inner(node, is_on_path, path, is_root) {
-            if (!node.children) {
-                return {
-                    node: is_on_path ? null : node,
-                    move: is_on_path ? node : null,
-                };
-            }
-
-            let new_children = [];
-            if (!is_on_path) {
-                return {
-                    node: node,
-                    move: null,
-                };
-            }
-
-            if (path.length === 0) {
-                // node is selected, is nonterminal
-                return {
-                    node: null,
-                    move: node,
-                };
-            }
-
-            let new_path = path.slice(1);
-
-            if (node.children.length === 1) {
-                let result = traverse_move_prune_inner(node.children[0], is_on_path, new_path, false);
-                node.children = [];
-                if (result.node && !result.move) {
-                    node.children = [result.node];
-                    return {
-                        node: node,
-                        move: null,
-                    };
-                } else if (result.move && !result.node) {
-                    return {
-                        node: null,
-                        move: result.move,
-                    };
-                } else if (result.node && result.move) {
-                    node.children = [result.node];
-                    if (is_root) {
-                        node.children.push(result.move);
-                    }
-                    return {
-                        node: node,
-                        move: is_root ? null : result.move,
-                    };
-                } else {
-                    console.error("unreachable", node.nonterminal);
-                }
-            }
-
-            let sel_idx = path[0];
-            let move = null;
-
-            for (let idx = 0; idx < node.children.length; idx++) {
-                let child = node.children[idx];
-                let result = traverse_move_prune_inner(child, sel_idx === idx, new_path, false)
-                if (result.node) {
-                    new_children.push(result.node);
-                }
-                if (is_root && result.move) {
-                    new_children.push(result.move);
-                } else {
-                    move = result.move ? result.move : move;
-                }
-            }
-
-            node.children = new_children;
-
-            return {
-                node: node,
-                move: move,
-            };
-        }
-
-        let result = traverse_move_prune_inner(node, true, path, true);
-        return result.node ? result.node : result.move;
+        insert_node(common_anc, translated_insert_path, result.sel_node, is_right_move);
     }
 
-    let path_from_tgt = [... curr_path].slice(tgt_path.length);
-    let pruned_tgt = traverse_move_prune(tgt_sel.node, path_from_tgt);
+    let before_text = tree_to_text(curr_sel.root_node);;
+    let after_text = tree_to_text(tgt_sel.root_node);;
+    if (before_text !== after_text) {
+        return true;
+    }
+
     undoable_dom_swap({start: tgt_sel});
     clearSelection();
 }

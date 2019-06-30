@@ -128,6 +128,7 @@ const ENUM = {
         CP: [
             "CP-ADV-ACK",
             "CP-ADV-CAUSE",
+            "CP-ADV-CMP",
             "CP-ADV-COND",
             "CP-ADV-CONS",
             "CP-ADV-PURP",
@@ -145,6 +146,7 @@ const ENUM = {
             "NP",
             "NP-ADDR",
             "NP-AGE",
+            "NP-ADP",
             "NP-DAT",
             "NP-IOBJ",
             "NP-MEASURE",
@@ -234,6 +236,7 @@ const ENUM = {
         P: "PP",
         PP: "NP",
         S: "S",
+        TO: "IP",
         VP: "IP",
         // terminals
         abfn: "NP",
@@ -249,7 +252,7 @@ const ENUM = {
         gr: "NP",
         grm: "NP",
         lo: "ADJP",
-        nhm: "INF",
+        nhm: "TO",
         no: "NP",
         p: "S",
         person: "NP",
@@ -293,8 +296,6 @@ const ENUM = {
             "ADVP",
             "C",
             "CP",
-            "DATEABS",
-            "DATEREL",
             "FOREIGN",
             "INF",
             "IP",
@@ -348,8 +349,6 @@ const ENUM = {
             "ADVP",
             "C",
             "CP",
-            "DATEABS",
-            "DATEREL",
             "FOREIGN",
             "INF",
             "IP",
@@ -372,6 +371,7 @@ const ENUM = {
             "CP-ADV-CONS",
             "CP-ADV-PURP",
             "CP-ADV-TEMP",
+            "ADVP-ADV-CMP",
         ],
         NP: [
             "NP-POSS",
@@ -425,15 +425,6 @@ const ENUM = {
     //     ],
     // }
 }
-
-/* Nonterminals without flags
-  S0
-  ADJP
-  DATEABS
-  DATEREL
-  INF
-  PP
-  */
 
 // TODO: _op
 // TODO: _subj

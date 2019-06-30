@@ -439,6 +439,11 @@ div.nonterminal-ip {
     border-left: 4px solid #777;
 }
 
+.nonterminal-to {
+    background: #ffa19d;
+    border-left: 4px solid #b7312d;
+}
+
 .nonterminal-vp {
     background: #ffa19d;
     border-left: 4px solid #b7312d;
