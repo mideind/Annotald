@@ -892,7 +892,7 @@ function cycle_subvariant_by_variant_name (var_names, forward, sel) {
  * Insert phrasal node as parent of selected node/nodes
  */
 function insert_nonterminal(sel) {
-    if (!sel || !sel.start || !sel.start.node || sel.start.node.tree_id) {
+    if (!sel || !sel.start || !sel.start.node || sel.start.node.tree_id || !sel.start.node.parent) {
         return false;
     }
 
@@ -918,18 +918,12 @@ function insert_nonterminal(sel) {
         nonterminal: new_parent_name,
         children: [],
     };
-    let prev_parent = node.parent;
 
-    if (prev_parent) {
-        let child_idx = sel.start.path[sel.start.path.length - 1];
-        let end_child_idx = sel.is_multi ? sel.end.path[sel.end.path.length - 1] : child_idx;
-        for (let idx = end_child_idx; idx >= child_idx; idx--) {
-            let child = prev_parent.children[idx];
-            child.parent = new_node;
-            new_node.children.unshift(child);
-        }
-        prev_parent.children[child_idx] = new_node;
-    }
+    let child_idx = sel.start.path[sel.start.path.length - 1];
+    let end_child_idx = sel.is_multi ? sel.end.path[sel.end.path.length - 1] : child_idx;
+    let sel_length = end_child_idx - child_idx + 1;
+    let extracted_children = node.parent.children.splice(child_idx, sel_length, new_node);
+    new_node.children = extracted_children;
 
     return new_node;
 }
@@ -1436,9 +1430,6 @@ function get_all_trees() {
 
 // Keybindings
 function customCommands() {
-    // addCommand({ keycode: KEYS.C, shift: true }, toggleCollapsed);
-    // addCommand({ keycode: KEYS["2"], shift: true }, splitWord);
-
     addCommand({ keycode: KEYS.Q}, multiplexed_with_sel({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
         nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, FORWARD)),
@@ -1536,72 +1527,11 @@ function customCommands() {
         nonterminal: mk_undoable(prune_nonterminal),
     }));
 
-    // addCommand({ keycode: KEYS.RETURN}, multiplexed_with_sel({
-    //     // terminal: edit_term_elem,
-    //     // nonterminal: not_implemented_fn,
-    // }));
-
     addCommand({ keycode: KEYS.X}, with_sel(mk_undoable(insert_nonterminal)));
 
     addCommand({ keycode: KEYS.Z , ctrl: true}, undo_system.undo);
     addCommand({ keycode: KEYS.Z, shift: true}, undo_system.redo);
     addCommand({ keycode: KEYS.SPACE }, clearSelection);
 
-    // addCommand({ keycode: KEYS.GRAVE }, toggleLemmata);
-
     addCommand({ keycode: KEYS.SOLIDUS }, search);
 }
-
-
-/*
- * Default phrase label suggestions in context menu
- */
-var defaultConMenuGroup = ["VBPI","VBPS","VBDI","VBDS","VBI","VAN","VBN","VB"];
-
-/*
- * Phrase labels that are suggested in context menu when one of the other ones
- * is set
- */
-function customConMenuGroups() {
-    addConMenuGroup( ["IP-SUB","IP-MAT","IP-INF","IP-IMP","CP-QUE","QTP","FRAG"] );
-    addConMenuGroup( ["ADJP","ADJX","NP-MSR","QP","NP","ADVP","IP-PPL"] );
-    addConMenuGroup( ["NP-SBJ","NP-OB1","NP-OB2","NP-PRD","NP-POS","NP-PRN",
-                      "NP","NX","NP-MSR","NP-TMP","NP-ADV","NP-COM","NP-CMP",
-                      "NP-DIR","NP-ADT","NP-VOC","QP"] );
-    addConMenuGroup( ["PP","ADVP","ADVP-TMP","ADVP-LOC","ADVP-DIR","NP-MSR","NP-ADV"] );
-    addConMenuGroup( ["VBPI","VBPS","VBDI","VBDS","VBI","VAN","VBN","VB","HV"] );
-    addConMenuGroup( ["HVPI","HVPS","HVDI","HVDS","HVI","HV"] );
-    addConMenuGroup( ["RP","P","ADV","ADVR","ADVS","ADJ","ADJR","ADJS","C","CONJ","ALSO"] );
-    addConMenuGroup( ["WADVP","WNP","WPP","WQP","WADJP"] );
-    addConMenuGroup( ["CP-THT","CP-QUE","CP-REL","CP-DEG","CP-ADV","CP-CMP"] );
-}
-
-/*
- * Context menu items for "leaf before" shortcuts
- */
-function customConLeafBefore() {
-    addConLeafBefore("WNP" , "0"     );
-    addConLeafBefore("WADVP" , "0"     );
-    addConLeafBefore("WADJP" , "0"     );
-    addConLeafBefore("NP-SBJ" , "*"     );
-    addConLeafBefore("NP-SBJ" , "*exp*"     );
-    addConLeafBefore("NP-SBJ" , "*con*"     );
-    addConLeafBefore("NP-SBJ" , "*pro*"     );
-    addConLeafBefore("C"      , "0"         );
-    addConLeafBefore("CODE"   , "{COM:XXX}" );
-    addConLeafAfter("CODE"   , "{COM:XXX}" );
-}
-
-// An example of a CSS rule for coloring a syntactic tag.  The styleTag
-// function takes care of setting up a (somewhat complex) CSS rule that
-// applies the given style to any node that has the given label.  Dash tags
-// are accounted for, i.e. NP also matches NP-FOO (but not NPR).  The
-// lower-level addStyle() function adds its argument as CSS code to the
-// document.
-// styleTag("NP", "color: red");
-
-// An example of a CSS rule for coloring a dash tag.  Similarly to the
-// styleTag function, styleDashTag takes as an argument the name of a dash tag
-// and CSS rule(s) to apply to it.
-
-// styleDashTag("FLAG", "color: red");
