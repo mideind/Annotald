@@ -28,6 +28,7 @@ In order to use it, you must first install the ReynirPackage,
 
 import os
 from pathlib import Path
+import sys
 
 from nltk import Tree
 from annotald.util import AnnoTree
@@ -41,6 +42,7 @@ except ImportError as e:
             "(pip install reynir)"
         )
     )
+    sys.exit(1)
 
 import annotald.util as util
 

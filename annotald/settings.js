@@ -931,9 +931,35 @@ function insert_nonterminal(sel) {
 let wrapped_insert_nonterminal = mk_undoable(insert_nonterminal);
 
 /*
- * Insert phrasal node as parent of selected node
+ * Remove phrasal node at path
  */
-function prune_nonterminal_new(sel) {
+function prune_at_path(anc_node, path) {
+    if (path.length === 0) {
+        console.err("cannot remove node at empty path");
+        return;
+    }
+    let child_idx = path[path.length - 1];
+    let parent_node = anc_node;
+    if (path.length !== 1) {
+        parent_node = traverse_node_path(anc_node, path.slice(0, path.length - 1));
+    }
+    let node_to_prune = parent_node.children[child_idx];
+    let left_siblings = parent_node.children.filter((val, idx) => idx < child_idx);
+    let right_siblings = parent_node.children.filter((val, idx) => idx > child_idx);
+    let children = left_siblings.concat(node_to_prune.children).concat(right_siblings);
+    for (let child of children) {
+        if (child.parent) {
+            child.parent = parent_node;
+        }
+    }
+    parent_node.children = children;
+    return true;
+}
+
+/*
+ * Remove phrasal node at selection, attaching children to parent of removed node
+ */
+function prune_nonterminal(sel) {
     let node = sel.start.node;
     if (!node.nonterminal || !node.parent) {
         // cannot delete terminals or tree root
@@ -948,7 +974,6 @@ function prune_nonterminal_new(sel) {
         child.parent = parent;
     }
     parent.children = children;
-    console.log(children);
     return true;
 }
 
@@ -1185,23 +1210,6 @@ let root_example = {
     tree_id: "tree_example.psd,.1",
     children: [nonterminal_example]
 };
-
-/*
- * Prune current nonterminal node that selected node points to
- */
-function prune_nonterminal(sel) {
-    if (sel.start.node.terminal || sel.start.node.tree_id) {
-        console.err("Cannot prune current node", sel.start.node);
-        return false;
-    }
-    let node = sel.start.node;
-    let path = [... sel.start.path];
-    let parent = node.parent;
-    let grand_parent = parent.parent;
-    let depth = path.length - 3;
-    grand_parent.children[path[depth]] = node;
-    return true;
-}
 
 /*
  * Clone (rooted) tree, omitting parent connections
@@ -1520,7 +1528,7 @@ function customCommands() {
     }));
     addCommand({ keycode: KEYS.V}, multiplexed_with_sel({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", FORWARD)),
-        nonterminal: mk_undoable(prune_nonterminal_new),
+        nonterminal: mk_undoable(prune_nonterminal),
     }));
     addCommand({ keycode: KEYS.V, shift: true}, multiplexed_with_sel({
         terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", BACKWARD)),

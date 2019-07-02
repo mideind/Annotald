@@ -395,20 +395,23 @@ function move_node(el) {
         };
     }
 
+    // insert new_node at path and return new path to inserted node
     function insert_node(node, path, new_node, insert_left) {
         if (path.length > 0) {
             let child_idx = path[0];
             let new_path = path.slice(1);
-            return insert_node(node.children[child_idx], new_path, new_node, insert_left);
+            let ret = insert_node(node.children[child_idx], new_path, new_node, insert_left);
+            return [child_idx].concat(ret);
         }
         if (insert_left) {
             node.children.unshift(new_node);
         } else {
             node.children.push(new_node);
         }
-        return true;
+        return [insert_left ? 0 : node.children.length - 1];
     }
 
+    // true if there are no right siblings of any node while traversing path else false
     function hugs_right(node, path, ignore_first) {
         if (path.length === 0)
             return true;
@@ -422,6 +425,7 @@ function move_node(el) {
         return false;
     }
 
+    // true if there are no left siblings of any node while traversing path else false
     function hugs_left(node, path, ignore_first) {
         if (path.length === 0)
             return true;
@@ -433,19 +437,19 @@ function move_node(el) {
             return hugs_left(node.children[child_idx], path.slice(1), false);
         }
         return false;
-
     }
 
-    let curr_sel = get_selection().start;
+    let curr_sel = get_selection();
+    let prune_sel = curr_sel.start;
     let tgt_sel = get_rooted_node_by_elem(el);  // fresh clone
     if (tgt_sel.node.terminal) {
         tgt_sel.path.pop();
         tgt_sel.node = tgt_sel.node.parent;
     }
-    let sel_path = curr_sel.path;
+    let sel_path = prune_sel.path;
     let tgt_path = tgt_sel.path;
 
-    if (curr_sel.root_node.tree_id !== tgt_sel.root_node.tree_id) {
+    if (prune_sel.root_node.tree_id !== tgt_sel.root_node.tree_id) {
         return;
     }
 
@@ -454,9 +458,11 @@ function move_node(el) {
     while (prefix_len <= max_len && sel_path[prefix_len] === tgt_path[prefix_len]) {
         prefix_len++;
     }
+    // path to youngest common ancestor
     let common_path = sel_path.slice(0, prefix_len);
-    let common_anc = traverse_node_path(tgt_sel.root_node, common_path);
+    let common_anc = traverse_node_path(prune_sel.root_node, common_path);
 
+    // paths relative to youngest common ancestor
     let prune_path = [... sel_path].slice(prefix_len);
     let insert_path = [... tgt_path].slice(prefix_len);
 
@@ -465,6 +471,15 @@ function move_node(el) {
         return true;
     }
 
+    let num_selected = 1;
+    if (curr_sel.is_multi) {
+        // insert temporary parent and move as if selection is a single node
+        console.log("inserting temporary parent")
+        insert_nonterminal(curr_sel);
+        let start_idx = curr_sel.start.path[curr_sel.start.path.length - 1];
+        let end_idx = curr_sel.end.path[curr_sel.end.path.length - 1];
+        num_selected =  end_idx - start_idx + 1
+    }
     let prune_right = hugs_right(common_anc, prune_path, true);
     let prune_left = hugs_left(common_anc, prune_path, true);
     let insert_right = insert_path.length > 0 && hugs_right(common_anc, insert_path, true);
@@ -483,16 +498,20 @@ function move_node(el) {
 
     let result = traverse_prune(common_anc, prune_path);
 
+    // path to inserted node, after it has been inserted, relative to youngest common ancestor
+    let post_insert_path = [... insert_path];
     if (insert_path.length === 0) {
         // moving to common ancestor
         if (result.did_prune) {
-            // insert in same place as top level of prune path
+            // insert in the same place as top level of prune path
             // we do not delete in splice, since it was already pruned
             common_anc.children.splice(prune_path[0], 0, result.sel_node);
+            post_insert_path = [prune_path[0]];
         } else {
             // insert on same side as prune hug
             let delta = prune_left ? 0 : 1;
             common_anc.children.splice(prune_path[0] + delta, 0, result.sel_node);
+            post_insert_path = [prune_path[0] + delta];
         }
     } else {
         // top level of prune_path and insert_path must be immediate siblings
@@ -503,18 +522,23 @@ function move_node(el) {
         }
         let translated_insert_path = [... insert_path];
         if (result.did_prune && is_right_move) {
-            translated_insert_path[0] = translated_insert_path[0] - 1;
+            translated_insert_path[0] = translated_insert_path[0] - num_selected;
         }
-        insert_node(common_anc, translated_insert_path, result.sel_node, is_right_move);
+        post_insert_path = insert_node(common_anc, translated_insert_path, result.sel_node, is_right_move);
     }
 
-    let before_text = tree_to_text(curr_sel.root_node);;
-    let after_text = tree_to_text(tgt_sel.root_node);;
+    if (curr_sel.is_multi) {
+        console.log("pruning temporary parent")
+        prune_at_path(common_anc, post_insert_path);
+    }
+
+    let after_text = tree_to_text(prune_sel.root_node);;
+    let before_text = tree_to_text(tgt_sel.root_node);;
     if (before_text !== after_text) {
         return true;
     }
 
-    undoable_dom_swap({start: tgt_sel});
+    undoable_dom_swap({start: prune_sel});
     clearSelection();
 }
 
