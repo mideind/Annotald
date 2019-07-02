@@ -227,6 +227,17 @@ const ENUM = {
         supine: ["sagnb"],
         impersonal: ["op"],
     },
+    VAR_ALLOW_EMPTY_SUBVAR: [
+        "article",
+        "case",
+        "gender",
+        "mood",
+        "obj1",
+        "obj2",
+        "strength",
+        "supine",
+        "voice",
+    ],
     DEFAULT_PARENT: {
         // nonterminals
         ADJP: "NP",
@@ -526,13 +537,19 @@ function cycle_nonterm_short_02(forward, sel) {
 
 /*
  * Get next element in array after or before given element
+ * optionally, if wrap_elem is truthy, it becomes an intermediate element when wrapping
  */
-function array_cycle_next_elem(arr, curr_elem, forward) {
+function array_cycle_next_elem(arr, curr_elem, forward, wrap_elem) {
     let curr_idx = arr.indexOf(curr_elem);
     let dir = forward ? 1 : -1;
-    let next_idx = curr_idx >= 0 ? (curr_idx + dir) % arr.length : 0;
-    next_idx = next_idx >= 0 ? next_idx : next_idx + arr.length;
-    return arr[next_idx];
+    let wrap_arr = [... arr];
+    // wrap_elem might be falsy even if we should use it, such as ""
+    if (wrap_elem !== undefined && wrap_elem !== false) {
+        wrap_arr.push(wrap_elem);
+    }
+    let next_idx = curr_idx >= 0 ? (curr_idx + dir) % wrap_arr.length : 0;
+    next_idx = next_idx >= 0 ? next_idx : next_idx + wrap_arr.length;
+    return wrap_arr[next_idx];
 }
 
 function cycle_terminal_category (forward, sel) {
@@ -876,10 +893,15 @@ function cycle_subvariant_by_variant_name (var_names, forward, sel) {
 
     let old = node.variants[var_name];
     let cycle = ENUM.VAR[var_name];
+    let empty_elem = false;
+    if (ENUM.VAR_ALLOW_EMPTY_SUBVAR.includes(var_name)) {
+        empty_elem = "";
+    }
     let new_item = array_cycle_next_elem(
         cycle,
         old,
-        forward
+        forward,
+        empty_elem
     );
     node.variants[var_name] = new_item
 
@@ -1519,11 +1541,11 @@ function customCommands() {
     }));
 
     addCommand({ keycode: KEYS.C}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", FORWARD)),
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "article", FORWARD)),
         nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.C, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "gr", BACKWARD)),
+        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "article", BACKWARD)),
         nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.V}, multiplexed_with_sel({

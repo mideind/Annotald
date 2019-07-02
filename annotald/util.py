@@ -43,6 +43,7 @@ from xml.etree import ElementTree as ET
 # External libraries
 import nltk.tree
 
+ARTICLE = {"gr"}
 CASES = {"nf", "þf", "þgf", "ef"}
 GENDERS = {"kk", "kvk", "hk"}
 NUMBERS = {"et", "ft"}
@@ -240,6 +241,7 @@ def split_flat_terminal(term_tok):
             case_control[0] = case.pop()
     obj1, obj2 = case_control
 
+    article = ARTICLE & variants
     case = CASES & variants
     gender = GENDERS & variants
     number = NUMBERS & variants
@@ -250,6 +252,7 @@ def split_flat_terminal(term_tok):
     mood = MOOD & variants
     misc = MISC & variants
     data = {
+        "article": article,
         "case": case,
         "gender": gender,
         "number": number,
