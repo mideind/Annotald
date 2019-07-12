@@ -132,9 +132,9 @@ class Treedraw(object):
         def convert_js_tree(tree_dict):
             if "tree_id" in tree_dict:
                 # root node and nonterminal
-                meta_node = AnnoTree("ID", [
-                    AnnoTree("ID-LOCAL", [tree_dict["tree_id"]]),
+                meta_node = AnnoTree("META", [
                     AnnoTree("ID-CORPUS", [tree_dict["corpus_id"]]),
+                    AnnoTree("ID-LOCAL", [tree_dict["tree_id"]]),
                     AnnoTree("URL", [tree_dict.get("url", "")]),
                     AnnoTree("COMMENT", [tree_dict.get("comment", "")]),
                 ])
