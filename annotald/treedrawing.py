@@ -132,13 +132,18 @@ class Treedraw(object):
         def convert_js_tree(tree_dict):
             if "tree_id" in tree_dict:
                 # root node and nonterminal
-                id_node = AnnoTree("ID", [tree_dict["tree_id"]])
+                meta_node = AnnoTree("ID", [
+                    AnnoTree("ID-LOCAL", [tree_dict["tree_id"]]),
+                    AnnoTree("ID-CORPUS", [tree_dict["corpus_id"]]),
+                    AnnoTree("URL", [tree_dict.get("url", "")]),
+                    AnnoTree("COMMENT", [tree_dict.get("comment", "")]),
+                ])
                 nt_node = AnnoTree(
                     tree_dict["nonterminal"],
                     [convert_js_tree(child) for child in tree_dict["children"]]
                 )
                 # pseudo_root
-                node = AnnoTree("", [id_node, nt_node])
+                node = AnnoTree("", [meta_node, nt_node])
             elif "nonterminal" in tree_dict:
                 # non-root nonterminal or no id
                 node = AnnoTree(

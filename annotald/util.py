@@ -101,21 +101,25 @@ class AnnoTree(nltk.tree.Tree):
     def to_html(cls, tree, version, extra_data=None):
         top_level_nodes = {child.label(): child for child in tree}
 
-        id_node = top_level_nodes.pop("ID", None)
+        meta_node = top_level_nodes.pop("META", None)
 
         real_root = next(iter(top_level_nodes.values()))
         snode = cls.to_html_inner(real_root)
 
-        if id_node:
-            id_str = cls.leaf_text(id_node)
+        if meta_node:
+            meta_children = {child.label(): child for child in meta_node}
             id_node = ET.Element(
                 "span",
-                text=id_str,
                 attrib={"class": " ".join(["wnode", "tree-id-node"])},
             )
+            id_str = cls.leaf_text(meta_children["ID-LOCAL"])
             id_node.text = id_str
             snode.insert(0, id_node)
+
             snode.attrib["data-tree_id"] = id_str
+            snode.attrib["data-corpus_id"] = cls.leaf_text(meta_children["ID-CORPUS"])
+            snode.attrib["data-comment"] = cls.leaf_text(meta_children["COMMENT"]) or ""
+            snode.attrib["data-url"] = cls.leaf_text(meta_children["URL"])
 
         result = ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
 

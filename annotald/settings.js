@@ -806,6 +806,9 @@ function dom_node_to_tree (elem) {
         };
         if (elem.dataset.tree_id) {
             nt.tree_id = elem.dataset.tree_id;
+            nt.corpus_id = elem.dataset.corpus_id;
+            nt.url = elem.dataset.url;
+            nt.comment = elem.dataset.comment;
         }
         return nt
     }
