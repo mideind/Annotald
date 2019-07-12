@@ -1066,6 +1066,10 @@ let undo_system = (function () {
         let curr_elem = $(`div.snode[data-tree_id='${tree_before.tree_id}']`).first().get(0);
         elem_before.id = curr_elem.id;
         elem_before.dataset.tree_id = curr_elem.dataset.tree_id;
+        elem_before.dataset.corpus_id = curr_elem.dataset.corpus_id;
+        elem_before.dataset.url = curr_elem.dataset.url;
+        elem_before.dataset.comment = curr_elem.dataset.comment;
+
         let curr_tree = clone_tree(get_rooted_node_by_elem(curr_elem).root_node);
 
         redo_stack.push(curr_tree);
@@ -1084,6 +1088,9 @@ let undo_system = (function () {
         let curr_elem = $(`div.snode[data-tree_id='${tree_after.tree_id}']`).first().get(0);
         elem_after.id = curr_elem.id;
         elem_after.dataset.tree_id = curr_elem.dataset.tree_id;
+        elem_after.dataset.corpus_id = curr_elem.dataset.corpus_id;
+        elem_after.dataset.url = curr_elem.dataset.url;
+        elem_after.dataset.comment = curr_elem.dataset.comment;
         let curr_tree = clone_tree(get_rooted_node_by_elem(curr_elem).root_node);
 
         undo_stack.push(curr_tree);
@@ -1128,6 +1135,9 @@ function undoable_dom_swap(sel) {
     let root_elem_out = tree_to_dom_elem(sel.start.root_node);
     root_elem_out.id = root_elem_in.id;
     root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id;
+    root_elem_out.dataset["corpus_id"] = sel.start.root_node.corpus_id;
+    root_elem_out.dataset["url"] = sel.start.root_node.url;
+    root_elem_out.dataset["comment"] = sel.start.root_node.comment;
     undo_system.record(sel.start.cloned_root);
     // use legacy undo system defined in treedrawing.js
     undoBeginTransaction();
@@ -1159,6 +1169,9 @@ function mk_undoable (effectful_fn) {
         let root_elem_out = tree_to_dom_elem(sel.start.root_node);
         root_elem_out.id = root_elem_in.id;
         root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id;
+        root_elem_out.dataset["corpus_id"] = sel.start.root_node.corpus_id;
+        root_elem_out.dataset["url"] = sel.start.root_node.url;
+        root_elem_out.dataset["comment"] = sel.start.root_node.comment;
 
         // use legacy undo system defined in treedrawing.js
         undoBeginTransaction();
@@ -1233,6 +1246,9 @@ let nonterminal_example = {
 let root_example = {
     nonterminal: "S0",
     tree_id: "tree_example.psd,.1",
+    corpus_id: "afb23-31213-1123-1123.7",
+    url: "http://mbl.is/foo/",
+    comment: "tree_example.psd,.1",
     children: [nonterminal_example]
 };
 
