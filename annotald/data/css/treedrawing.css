@@ -1,0 +1,622 @@
+/* Copyright (c) 2011 Anton Karl Ingason, Aaron Ecay
+ *
+ * This file is part of the Annotald program for annotating
+ * phrase-structure treebanks in the Penn Treebank style.
+ *
+ * This file is distributed under the terms of the GNU General Public
+ * License as published by the Free Software Foundation, either version
+ * 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/>. */
+
+
+/* Whole document */
+body {
+    font-family: sans,verdana;
+    font-size: 12px;
+    margin: 0px;
+    padding: 0px;
+    background-color: #D2B48C;
+    /*
+     * This is the right thing to do to prevent inadvertent drags from
+     * selecting text, but inexplicably this creates a big slowdown in
+     * the UI. WTF, Chrome?
+
+    -webkit-user-select: none;
+    */
+}
+
+/* Nodes */
+.snode {
+    margin-left: 20px;
+    border: 1px solid silver;
+    border-left: 4px solid #4682B4;
+    background-color: #EFEFEF;
+    padding: 2px;
+    cursor: pointer;
+    color: black;
+    user-select: none;
+}
+
+.wnode {
+    margin-left: 20px;
+    padding-left: 4px;
+    padding-right: 4px;
+    border: 1px solid black;
+    background-color: white;
+    color: black;
+    user-select: none;
+}
+
+#sn0 {
+    background-color: #D2B48C;
+    border: 1px solid black;
+    margin-left: 10%;
+    margin-right: 5%;
+    display: inline-block;
+}
+
+#sn0 > .snode {
+    border: 2px solid black;
+}
+
+.snodesel {
+    /* This needs to override any user-supplied background colors, since
+     * selection is more important.
+     */
+    /* background-color: #4682B4 !important; */
+    filter: brightness(60%);
+                                         /* !important; */
+}
+
+.collapsed .snode {
+    margin-left: 0px;
+    border: none;
+    border-left: none;
+    padding: 0px;
+    display: inline;
+
+    /* Ugly hack! Ideally we'd put the node POS labels in a span, so
+     * that we could just do .collapsed .label {display: none}.  But
+     * would trigger lots of other changes in the code... */
+    font-size: 0px;
+
+}
+
+.collapsed .wnode {
+    margin-left: 0px;
+    padding-left: 0px;
+    padding-right: 0px;
+    border: none;
+    background-color: inherit;
+    font-size: 12px;
+}
+
+.collapsed .wnode:after {
+    content: " ";
+}
+
+.collapsed.snode {
+    border: 1px solid #A64274;
+    border-left: 4px solid #A64274;
+}
+
+.CODE {
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Menus */
+#menus {
+    position: fixed;
+    top: 5%;
+    left: 0px;
+    margin-left: 5px;
+    width: 15%;
+}
+
+.menuPane {
+    background: #FEF6EA;
+    padding-bottom: 4px;
+    border: 1px solid #857259;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.menubutton, #validatorsSelect {
+    width: 80%;
+}
+
+.menuTitle {
+    background-color: #2E2E2E;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    width: 100%;
+    height: 16px;
+}
+
+#treeIndexDisplay {
+    color: #4682B4;
+    font-weight: bold;
+}
+
+/* Tag/word editor */
+#editpane {
+    position: absolute;
+    top: 0px;
+    left: 16%;
+    margin: 0px;
+    padding: 0px;
+    width: 83%;
+    border: 1px solid #857259;
+    background-color: #FEEDD5;
+}
+
+.labeledit {
+    font-family: sans;
+    font-size: 12px;
+    background-color: #DCDBFF;
+    margin: 0px;
+    border: 0px;
+    width: 32%;
+}
+
+/* Metadata editor */
+
+.metadataTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+.metadataTable tbody tr .key {
+    width: 33%;
+}
+.metadataTable tbody tr .val {
+    width: 66%;
+}
+.metadataTable thead tr td {
+    font-weight: bold;
+    /* border-bottom: 1px solid #cccccc; */
+    padding-bottom: 4px;
+}
+
+.metadataField {
+    width: 100%;
+}
+
+/* Dialog box */
+#dialogBackground {
+    z-index: 998;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    background-color: rgba(1, 1, 1, 0.25);
+    visibility: hidden;
+    top: 0%;
+    left: 0%;
+}
+
+#dialogBox {
+    position: fixed;
+    top: 25%;
+    left: 25%;
+    width: 50%;
+    height: 50%;
+    opacity: 0.85;
+    visibility: hidden;
+    z-index: 999;
+    /* override the lighter menuPane color */
+    background-color: #D2B48C;
+}
+
+#dialogContent {
+    text-align: left;
+    position: absolute;
+    top: 22px; /* 16px (title) + 6 */
+    bottom: 12px; /* 6 px + 6 (I'm not sure where the extra 6 for bottom and right come from) */
+    left: 6px;
+    right: 12px;
+}
+
+#dialogButtons {
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
+}
+
+/* Comment editor */
+#commentEditBox {
+    position: absolute;
+    width: 75%;
+    left: 12.5%;
+    bottom: 12.5%;
+    top: 0%;
+}
+
+#commentEditButton {
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
+}
+
+#commentTypes {
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+}
+
+/* Context menu */
+#conMenu {
+    background-color:white;
+    border: 1px solid black;
+    /* width: 345px; */
+    width: auto;
+    z-index: 999;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    background-color: #efefef;
+    visibility: hidden;
+}
+
+.conMenuColumn {
+    width: 115px;
+    float: left;
+    /* border-right: 1px solid silver; */
+    /* border-left: 1px solid silver; */
+}
+
+.conMenuItem {
+    padding: 2px;
+    padding-left: 5px;
+}
+
+.conMenuHeading {
+    color: #FEEDD5;
+    background-color: black;
+    padding: 2px;
+    padding-left:5px;
+    border-bottom: 1px solid silver;
+    border-left: 1px solid silver;
+    font-weight: bold;
+}
+
+.conMenuItem:hover {
+    background-color: silver;
+}
+
+.conMenuItem > a {
+    text-decoration: none;
+    color: black;
+    display: block;
+}
+
+/* Message box */
+#messageBox {
+    position: fixed;
+    bottom: 5%;
+    width: 15%;
+}
+
+#messagesTitle {
+    cursor: pointer;
+}
+
+#messageBoxInner {
+
+}
+
+/* Search dialog */
+.searchnode {
+    margin-left: 20px;
+    border: 1px solid silver;
+    border-left: 4px solid #4682B4;
+    background-color: #EFEFEF;
+    padding: 2px;
+    color: black;
+}
+
+.newsearchnode {
+    margin-left: 20px;
+    border: 1px solid silver;
+    border-left: 4px solid #4682B4;
+    background-color: #EFEFEF;
+    padding: 2px;
+    color: black;
+}
+
+.searchadddelbuttons {
+    float: right;
+}
+
+.searchadddelbuttons input {
+    font-size: small;
+}
+
+.searchmatch {
+    border: 1px solid yellow !important;
+    border-left: 4px solid yellow !important;
+}
+
+/* TODO: special styles for the root node, or/deep/etc nodes */
+
+/* Misc */
+.shown {
+    visibility: visible;
+}
+
+#urtext {
+    display: block;
+    text-align: center;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 4px;
+    width: 60%;
+    padding: 4px;
+    margin: 1% auto;
+    background-color: #D2B48C;
+    border: 1px solid black;
+}
+
+/* Greynir nonterminal styling */
+
+.nonterminal-adjp-bak {
+    background: #bcd8ac;
+    border-left: 4px solid #3a963a;
+}
+
+.nonterminal-adjp {
+    background: #7de0ac;
+    border-left: 4px solid #4da08c;
+}
+
+.nonterminal-advp {
+    background: #bce09c;
+    border-left: 4px solid #3a963a;
+}
+
+.nonterminal-dateabs {
+    background: #bce09c;
+    border-left: 4px solid #3a963a;
+}
+
+.nonterminal-daterel {
+    background: #bce09c;
+    border-left: 4px solid #3a963a;
+}
+
+div.nonterminal-ip {
+    background: #ffe59c;
+    border-left: 4px solid #bc9f3c;
+}
+
+.nonterminal-cp {
+    background: #f2ac7c;
+    border-left: 4px solid #b57b3c;
+}
+
+.nonterminal-c {
+    background: #ffca75;
+    border-left: 4px solid #b57b3c;
+}
+
+.nonterminal-np {
+    background: #93bae7;
+    border-left: 4px solid #115895;
+}
+
+.nonterminal-p {
+    background: #ac96cb;
+    border-left: 4px solid #935093;
+}
+
+.nonterminal-pp {
+    background: #ac96cb;
+    border-left: 4px solid #935093;
+}
+
+.nonterminal-s {
+    background: #f2ac7c;
+    border-left: 4px solid #b57b3c;
+}
+
+.nonterminal-s0 {
+    background: #ccc;
+    border-left: 4px solid #443944;
+}
+
+.nonterminal-foreign {
+    background: #ccc;
+    border-left: 4px solid #777;
+}
+
+.nonterminal-to {
+    background: #ffa19d;
+    border-left: 4px solid #b7312d;
+}
+
+.nonterminal-vp {
+    background: #ffa19d;
+    border-left: 4px solid #b7312d;
+}
+
+.nonterminal-inf {
+    background: #ffa19d;
+    border-left: 4px solid #b7312d;
+}
+
+/* Greynir terminal styling */
+
+.terminal-fs {
+    background: #e3b0e3;
+    border-left: 4px solid #834083;
+}
+
+.terminal-x {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-no {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-sérnafn {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-person {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-entity {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-abfn {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-fn {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-pfn {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-töl {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-ao {
+    background: #bffa90;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-tao {
+    background: #bffa90;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-eo {
+    background: #bffa90;
+    border-left: 4px solid #3a963a;
+}
+
+.terminal-lo {
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
+}
+
+.terminal-to {
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
+}
+
+.terminal-ártal {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-dags {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-fyrirtæki {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-gata {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-gr {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-\. {
+    background: #ccc;
+    border-left: 4px solid #443944;
+}
+
+.terminal-foreign {
+    background: #e8e8e8;
+    border-left: 4px solid #777;
+}
+
+.terminal-prósenta {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-raðnr {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-so {
+    background: #ffd1cd;
+    border-left: 4px solid #b7312d;
+}
+
+.terminal-nhm {
+    background: #ffd1cd;
+    border-left: 4px solid #b7312d;
+}
+
+.terminal-spao {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-st {
+    background: #f0eead;
+    border-left: 4px solid #cc8b2c;
+}
+
+.terminal-stt {
+    background: #f0eead;
+    border-left: 4px solid #cc8b2c;
+}
+
+.terminal-tala {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-tímapunktur {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-tími {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-uh {
+    background: #FFFFFF;
+    border-left: 4px solid #FF0000;
+}
