@@ -93,6 +93,7 @@ const FORWARD = true;
 const BACKWARD = false;
 
 const ENUM = {
+    // All nonterminal prefixes
     NONTERMS: [
         "ADJP",
         "ADVP",
@@ -108,6 +109,7 @@ const ENUM = {
         "S0",
         "VP",
     ],
+    // All sufixes for a given particular nonterminal prefix
     NONTERM_SUFFIX: {
         ADVP: [
             "ADVP",
@@ -177,6 +179,7 @@ const ENUM = {
             "VP-AUX"
         ],
     },
+    // All allowed terminal categories
     TERM: [
         "abfn",
         "ao",
@@ -191,6 +194,7 @@ const ENUM = {
         "gata",
         "gr",
         "grm",
+        "lén",
         "lo",
         "nhm",
         "no",
@@ -211,6 +215,7 @@ const ENUM = {
         "uh",
         "x",
     ],
+    // Variant name to subvariants
     VAR: {
         gender: ["kk", "kvk", "hk"],
         number: ["et", "ft"],
@@ -227,6 +232,7 @@ const ENUM = {
         supine: ["sagnb"],
         impersonal: ["op"],
     },
+    // Variants which can an empty subvariant
     VAR_ALLOW_EMPTY_SUBVAR: [
         "article",
         "case",
@@ -238,6 +244,7 @@ const ENUM = {
         "supine",
         "voice",
     ],
+    // Default parent of terminal tags and nonterminal prefixes
     DEFAULT_PARENT: {
         // nonterminals
         ADJP: "NP",
@@ -283,6 +290,7 @@ const ENUM = {
         uh: "ADVP",
         ".": "S",
     },
+    // The variants which a particular terminal category can have
     CAT_TO_VAR: {
         ao: ["degree"],
         no: ["number", "case", "gender", "article"],
@@ -300,7 +308,9 @@ const ENUM = {
         person: ["case", "gender"],
         raðnr: ["case", "gender"],
         sérnafn: ["case"],
+        lén: ["case"],
     },
+    // Cycle groups for which keyboard mappings can be assigned to cycle through
     SHORT_01: {
         NONTERM: [
             "ADJP",

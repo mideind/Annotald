@@ -143,15 +143,6 @@ def tok_stream_to_null_reynir(tok_stream):
     return tree
 
 
-def insert_id(tree, prefix, index):
-    """ Insert ID element into NLTK.Tree object as child of first node,
-        (... ...
-             (ID {prefix},.{index}))
-    """
-    id_str = "{prefix},.{index}".format(prefix=prefix, index=index)
-    tree.insert(0, AnnoTree("ID", [id_str]))
-
-
 def reynir_sentence_to_annotree(sent):
     if sent.tree is not None:
         nltk_tree = simpleTree2NLTK(sent.tree)
@@ -160,13 +151,11 @@ def reynir_sentence_to_annotree(sent):
     return nltk_tree
 
 
-def parse_single(text, affix_lemma=1, id_prefix=None, start_index=1):
+def parse_single(text):
     """ Parse a single sentence into reynir simple trees in bracket format """
     r = Reynir()
     sent = r.parse_single(text)
     nltk_tree = reynir_sentence_to_annotree(sent.tree)
-    if id_prefix is not None:
-        insert_id(nltk_tree, id_prefix, start_index)
     return nltk_tree
 
 
@@ -177,9 +166,19 @@ def parse_text_file(file_handle, affix_lemma=1, id_prefix=None, start_index=1):
     dd = r.parse(text)
     for idx, sent in enumerate(dd["sentences"]):
         nltk_tree = reynir_sentence_to_annotree(sent)
-        if id_prefix is not None:
-            insert_id(nltk_tree, id_prefix, start_index + idx)
-        yield nltk_tree
+        id_prefix = "" if id_prefix is None else id_prefix
+        id_str = "{}.{}".format(id_prefix, idx)
+        meta_node = AnnoTree(
+            "META",
+            [
+                AnnoTree("ID-CORPUS", [id_str]),
+                AnnoTree("ID-LOCAL", [id_str]),
+                AnnoTree("URL", ["greynir.is"]),
+                AnnoTree("COMMENT", [""]),
+            ],
+        )
+        meta_tree = AnnoTree("", [meta_node, nltk_tree])
+        yield meta_tree
 
 
 def parse_tsv_file(file_handle, reorder=True):
