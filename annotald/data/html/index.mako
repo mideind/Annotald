@@ -33,10 +33,6 @@ any later version.  See the LICENSE file for more information. -->
 %endfor
     <script type= "application/javascript">  ${currentSettings} </script>
     <script type= "application/javascript" src="scripts/treedrawing.contextMenu.js"></script>
-%if test:
-    <script type="application/javascript"
-    src="scripts/test.js"></script>
-%endif
 
   </head>
   <body oncontextmenu="return false;">
@@ -53,39 +49,23 @@ any later version.  See the LICENSE file for more information. -->
         <input class="menubutton" type="button" value="Undo" id="butundo" /><br />
         <input class="menubutton" type="button" value="Redo" id="butredo" /><br />
         </div>
-%if partialFile:
-        <input class="menubutton" type="button" value="Prev Tree" id="butprevtree" /><br />
-        <input class="menubutton" type="button" value="Next Tree" id="butnexttree" /><br />
-	<input class="menubutton" type="button" value="GoTo Tree #" id="butgototree" /><br />
-	<div id="treeIndexDisplay">Editing tree #${treeIndexStatement}</div>
-%endif
-%if usetimelog:
-        <input class="menubutton" type="button" value="Idle/Resume" id="butidle" /><br />
-%endif
-%if test:
-        <input class="menubutton" type="button" value="Run Tests"
-        id="buttests" /><br />
-%endif
         <input class="menubutton" type="button" value="Exit" id="butexit" /><br />
       </div>
 
       <div id="toolsMenu" class="menuPane">
         <div class="menuTitle">Tools</div>
+        <!--
         <input class="menubutton" type="button" value="Search"
                id="butsearch" style="margin-top:4px;" /><br />
         <div id="matchcommands">
           <input class="menubutton" type="button" value="Next Match" id="butnextmatch" /><br />
           <input class="menubutton" type="button" value="Clear Matches" id="butclearmatch" /><br />
         </div>
-%if useValidator:
-        <select name="validators" id="validatorsSelect">
-%for v in validators:
-          <option value="${v}">${v}</option>
-%endfor
         </select>
         <input class="menubutton" type="button" value="Validate" id="butvalidate" /><br />
         <input class="menubutton" type="button" value="Next Error" id="butnexterr" /><br />
-%endif
+        -->
+        <input class="menubutton" type="button" value="Show Comments" id="button-comment" /><br />
       </div>
       <div id="metadataEditor"
 %if not usemetadata:
@@ -138,4 +118,7 @@ any later version.  See the LICENSE file for more information. -->
     <div id="urtext"></div>
 
   </body>
+  <script>
+  var annotrees = ${annotrees} ;
+  </script>
 </html>

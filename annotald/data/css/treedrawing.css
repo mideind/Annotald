@@ -531,6 +531,11 @@ div.nonterminal-ip {
     border-left: 4px solid #4da08c;
 }
 
+.terminal-raðnr {
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
+}
+
 .terminal-ártal {
     background: #FFFFFF;
     border-left: 4px solid #FF0000;
@@ -567,11 +572,6 @@ div.nonterminal-ip {
 }
 
 .terminal-prósenta {
-    background: #FFFFFF;
-    border-left: 4px solid #FF0000;
-}
-
-.terminal-raðnr {
     background: #FFFFFF;
     border-left: 4px solid #FF0000;
 }

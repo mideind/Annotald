@@ -91,6 +91,8 @@ const MOUSE = {
 }
 
 var endnode = null;
+var tree_manager = null;
+var context_menu = null;
 var ctrlKeyMap = {};
 var shiftKeyMap = {};
 var regularKeyMap = {};
@@ -139,39 +141,29 @@ addStartupHook(function() {
     logEvent("page-load");
 });
 
-function assignEvents() {
+function assignEvents(mgr) {
     // load custom commands from user settings file
-    customCommands();
+    customCommands(mgr);
     document.body.onkeydown = handleKeyDown;
-    $("#sn0").mousedown(handleNodeClick);
-    $("#sn0").dblclick(handleNodeDoubleClick);
+    // $("#sn0").mousedown(handleNodeClick);
+    $("#sn0").mousedown(editpane_click_handler);
+    // $("#sn0").dblclick(handleNodeDoubleClick);
+    $("#sn0").dblclick(handle_double_click);
     document.body.onmouseup = killTextSelection;
     $("#butsave").mousedown(save);
-    $("#butundo").mousedown(undo);
-    $("#butredo").mousedown(redo);
+    $("#butundo").mousedown(mgr.undo);
+    $("#butredo").mousedown(mgr.redo);
     $("#butidle").mousedown(idle);
     $("#butexit").unbind("click").click(quitServer);
-    $("#butvalidate").unbind("click").click(validateTrees);
-    $("#butnexterr").unbind("click").click(nextValidationError);
-    $("#butnexttree").unbind("click").click(nextTree);
-    $("#butprevtree").unbind("click").click(prevTree);
-    $("#butgototree").unbind("click").click(goToTree);
-    $("#editpane").mousedown(clearSelection);
-    $("#conMenu").mousedown(hideContextMenu);
-    $(document).mousewheel(handleMouseWheel);
+    // $("#butvalidate").unbind("click").click(validateTrees);
+    // $("#butnexterr").unbind("click").click(nextValidationError);
+    // $("#butnexttree").unbind("click").click(nextTree);
+    // $("#butprevtree").unbind("click").click(prevTree);
+    // $("#butgototree").unbind("click").click(goToTree);
+    $("#editpane").mousedown(mgr.clear_selection);
+    // $(document).mousewheel(handleMouseWheel);
     window.onbeforeunload = navigationWarning;
     window.onunload = logUnload;
-}
-
-function styleIpNodes() {
-    console.log("styling ip nodes");
-    // if (typeof ipnodes !== "undefined") {
-    //     for (var i = 0; i < ipnodes.length; i++) {
-    //         styleTag(ipnodes[i], "border-top: 1px solid black;" +
-    //                  "border-bottom: 1px solid black;" +
-    //                  "background-color: #C5908E;");
-    //     }
-    // }
 }
 
 function addStartupHook(fn) {
@@ -181,7 +173,10 @@ function addStartupHook(fn) {
 function documentReadyHandler() {
     // TODO: something is very slow here; profile
     // TODO: move some of this into hooks
-    assignEvents();
+    tree_manager = new TreeManager();
+    tree_manager.init();
+    context_menu = new ContextMenu(tree_manager);
+    assignEvents(tree_manager);
     setupCommentTypes();
     globalStyle.appendTo("head");
 
@@ -200,48 +195,6 @@ $(document).ready(function () {
 
 // ========== CSS styles
 
-function addStyle(string) {
-    var style = globalStyle.text() + "\n" + string;
-    globalStyle.text(style);
-}
-
-/**
- * Add a css style for a certain tag.
- *
- * @param {String} tagName The tag which to style.  Will match instances of
- * the given tag with additional trailing dash tags.
- * @param {String} css The css style declarations to associate with the tag.
- */
-// function styleTag(tagName, css) {
-//     addStyle('*[class*=" ' + tagName + '-"],*[class*=" ' + tagName +
-//              ' "],*[class$=" ' + tagName + '"],[class*=" ' + tagName +
-//              '="] { ' + css + ' }');
-// }
-
-/**
- * Add a css style for a certain dash tag.
- *
- * @param {String} tagName The tag which to style.  Will match any node with
- * this dash tag.  Should not itself have leading or trailing dashes.
- * @param {String} css The css style declarations to associate with the tag.
- */
-// function styleDashTag(tagName, css) {
-//     addStyle('*[class*="-' + tagName + '-"],*[class*="-' + tagName +
-//              ' "],*[class$="-' + tagName + '"],[class*="-' + tagName +
-//              '="] { ' + css + ' }');
-// }
-
-/**
- * A convenience function to wrap {@link styleTag}.
- *
- * @param {Array} tagNames Tags to style.
- * @param {String} css The css style declarations to associate with the tags.
- */
-// function styleTags(tagNames, css) {
-//     for (var i = 0; i < tagNames.length; i++) {
-//         styleTag(tagNames[i], css);
-//     }
-// }
 
 // ========== Key bindings
 
@@ -287,33 +240,18 @@ function killTextSelection() {
     sel.removeAllRanges();
 }
 
-function handleMouseWheel(e, delta) {
-    if (e.shiftKey && startnode) {
-        var nextNode;
-        if (delta < 0) { // negative means scroll down, counterintuitively
-             nextNode = $(startnode).next().get(0);
-        } else {
-            nextNode = $(startnode).prev().get(0);
-        }
-        if (nextNode) {
-            selectNode(nextNode);
-            scrollToShowSel();
-        }
-    }
-}
-
 var keyDownHooks = [];
 
 function addKeyDownHook(fn) {
     keyDownHooks.push(fn);
 }
 
-function handleKeyDown(e) {
-    if ((e.ctrlKey && e.shiftKey) || e.metaKey || e.altKey) {
+function handleKeyDown(ev) {
+    if ((ev.ctrlKey && ev.shiftKey) || ev.metaKey || ev.altKey) {
         // unsupported modifier combinations
         return true;
     }
-    if (e.keyCode == 16 || e.keyCode == 17 || e.keyCode == 18) {
+    if (ev.keyCode == KEYS.SHIFT || ev.keyCode == KEYS.CONTROL || ev.keyCode == KEYS.ALT) {
         // Don't handle shift, ctrl, and meta presses
         return true;
     }
@@ -322,36 +260,33 @@ function handleKeyDown(e) {
     if (! _.contains([33, //page up
                       34, // page down
                       37,38,39,40 // arrow keys
-                     ], e.keyCode)) {
+                     ], ev.keyCode)) {
         last_event_was_mouse = false;
     }
     var commandMap;
-    if (e.ctrlKey) {
+    if (ev.ctrlKey) {
         commandMap = ctrlKeyMap;
-    } else if (e.shiftKey) {
+    } else if (ev.shiftKey) {
         commandMap = shiftKeyMap;
     } else {
         commandMap = regularKeyMap;
     }
-    if (!commandMap[e.keyCode]) {
+    if (!commandMap[ev.keyCode]) {
         return true;
     }
-    e.preventDefault();
-    var theFn = commandMap[e.keyCode].func;
-    var theArgs = commandMap[e.keyCode].args;
+    ev.preventDefault();
+    var theFn = commandMap[ev.keyCode].func;
+    var theArgs = commandMap[ev.keyCode].args;
     _.each(keyDownHooks, function (fn) {
         fn({
-            keyCode: e.keyCode,
-            shift: e.shiftKey,
-            ctrl: e.ctrlKey
+            keyCode: ev.keyCode,
+            shift: ev.shiftKey,
+            ctrl: ev.ctrlKey
            },
           theFn,
           theArgs);
     });
-    theFn.apply(undefined, theArgs);
-    if (!theFn.async) {
-        undoBarrier();
-    }
+    theFn()
     return false;
 }
 
@@ -365,12 +300,13 @@ let prev_startnode = null;
 
 /* If last clicked element was a wnode node, this points to it, otherwise null */
 let last_wnode = null;
+let last_sel = null;
 /* Guard against double single clicks, jQuery or the browser does not natively suppress
    the second single click when the dblclick event fires */
 let clicks = 0;
-const CLICK_INTERVAL_MILLISECS = 400;
+const CLICK_INTERVAL_MILLISECS = 300;
 
-function move_node(el) {
+function move_node(sel, tgt_path) {
     function traverse_prune(node, path) {
         if (path.length == 0) {
             return {
@@ -439,46 +375,39 @@ function move_node(el) {
         return false;
     }
 
-    let curr_sel = get_selection();
-    let prune_sel = curr_sel.start;
-    let tgt_sel = get_rooted_node_by_elem(el);  // fresh clone
-    if (tgt_sel.node.terminal) {
-        tgt_sel.path.pop();
-        tgt_sel.node = tgt_sel.node.parent;
-    }
-    let sel_path = prune_sel.path;
-    let tgt_path = tgt_sel.path;
+    let curr_sel = sel;
 
-    if (prune_sel.root_node.tree_id !== tgt_sel.root_node.tree_id) {
-        return;
+    let tree = sel.aug_tree.tree;
+    let tgt_node = traverse_node_path(tree, tgt_path);
+    let before_text = tree_to_text(tree);
+    let cloned = clone_obj(tree);
+
+    let sel_path = sel.start;
+
+    if (tgt_node.terminal) {
+        // terminal element cannot be a parent
+        tgt_path.pop();
     }
 
-    let prefix_len = 0;
-    let max_len = Math.min(sel_path.length, tgt_path.length);
-    while (prefix_len <= max_len && sel_path[prefix_len] === tgt_path[prefix_len]) {
-        prefix_len++;
-    }
-    // path to youngest common ancestor
-    let common_path = sel_path.slice(0, prefix_len);
-    let common_anc = traverse_node_path(prune_sel.root_node, common_path);
+    let common_path = common_prefix(sel_path, tgt_path);
+    let common_anc = traverse_node_path(tree, common_path);
 
     // paths relative to youngest common ancestor
-    let prune_path = [... sel_path].slice(prefix_len);
-    let insert_path = [... tgt_path].slice(prefix_len);
+    let prune_path = [... sel_path].slice(common_path.length);
+    let insert_path = [... tgt_path].slice(common_path.length);
 
     if (prune_path.length === 0) {
         // something strange
-        return true;
+        return false;
     }
 
     let num_selected = 1;
-    if (curr_sel.is_multi) {
-        // insert temporary parent and move as if selection is a single node
-        console.log("inserting temporary parent")
+    if (sel.start && sel.end) {
+        // inserting temporary parent
         insert_nonterminal(curr_sel);
-        let start_idx = curr_sel.start.path[curr_sel.start.path.length - 1];
-        let end_idx = curr_sel.end.path[curr_sel.end.path.length - 1];
-        num_selected =  end_idx - start_idx + 1
+        let start_idx = curr_sel.start[curr_sel.start.length - 1];
+        let end_idx = curr_sel.end[curr_sel.end.length - 1];
+        num_selected =  end_idx - start_idx + 1;
     }
     let prune_right = hugs_right(common_anc, prune_path, true);
     let prune_left = hugs_left(common_anc, prune_path, true);
@@ -487,13 +416,13 @@ function move_node(el) {
 
     if (insert_path.length > 0 && !insert_right && !insert_left) {
         // something strange, path hugs neither, cannot insert in between unless moving to parent
-        return true;
+        return false;
     } else if (insert_path.length === 0 && prune_path.length < 2) {
         // moving to immediate parent, but node is already there
-        return true;
+        return false;
     } else if (insert_path.length > 0 && Math.abs(prune_path[0] - insert_path[0]) !== 1) {
         // moving between distant siblings
-        return true;
+        return false;
     }
 
     let result = traverse_prune(common_anc, prune_path);
@@ -526,80 +455,86 @@ function move_node(el) {
         }
         post_insert_path = insert_node(common_anc, translated_insert_path, result.sel_node, is_right_move);
     }
-
-    if (curr_sel.is_multi) {
-        console.log("pruning temporary parent")
+        if (sel.start && sel.end) {
+        // pruning temporary parent
         prune_at_path(common_anc, post_insert_path);
     }
 
-    let after_text = tree_to_text(prune_sel.root_node);;
-    let before_text = tree_to_text(tgt_sel.root_node);;
+    let after_text = tree_to_text(tree);
     if (before_text !== after_text) {
-        return true;
+        return false;
     }
 
-    undoable_dom_swap({start: prune_sel});
-    clearSelection();
+    sel.start = [... common_path].concat(post_insert_path);
+    sel.end = null;
+    if (num_selected > 1) {
+        let end = [... sel.start];
+        end[end.length - 1] = end[end.length - 1] + num_selected - 1;
+        sel.end = end;
+    }
+    return sel;
 }
 
-function handleNodeClick(e) {
+function editpane_click_handler (ev) {
     if (clicks > 0) {
-        e.preventDefault();
+        ev.preventDefault();
         return true;
     }
     clicks++;
     setTimeout(function () { clicks = 0;}, CLICK_INTERVAL_MILLISECS);
 
-    e = e || window.event;
-    let element = (e.target || e.srcElement);
-    if (element.classList && [... element.classList].includes("wnode")) {
+    ev = ev || window.event;
+    let element = (ev.target || ev.srcElement);
+    if ([... element.classList].includes("wnode")) {
         last_wnode = element;
     } else {
         last_wnode = null;
     }
 
-    saveMetadata();
-    if (e.button == MOUSE.RIGHT_BUTTON) {
-        if (startnode && !endnode) {
-            if (startnode != element) {
-                e.stopPropagation();
-                move_node(element);
-                // moveNode(element);
-            } else {
-                showContextMenu(e);
-            }
-        } else if (startnode && endnode) {
-            e.stopPropagation();
-            // moveNodes(element);
-            move_node(element);
-        } else {
-            selectNode(element, true);
-            showContextMenu(e);
-        }
-    } else if (e.button == MOUSE.LEFT_BUTTON) {
-        hideContextMenu();
-        if (e.shiftKey && startnode) {
-            selectNode(element);
-            e.preventDefault(); // Otherwise, this sets the text
-                                // selection in the browser...
-        } else {
-            selectNode(element);
-        }
-    } else if (e.button == MOUSE.MIDDLE_BUTTON) {
-        clearSelection();
-        selectNode(element);
-        wrapped_insert_nonterminal(get_selection());
+    let tree_node = $(element).parents().andSelf().filter(".tree-node").last().get(0);
+    if (!tree_node) {
+        return false;
+    }
 
+    let tgt_path = string_to_path(tree_node.dataset.path);
+    let tgt_idx = parseInt(tree_node.dataset.tree_index);
+    let tgt_dom_id = tree_manager.index_to_dom_id(tgt_idx);
+
+    if (ev.button == MOUSE.LEFT_BUTTON) {
+        context_menu.hide();
+        tree_manager.select(tgt_dom_id, tgt_path);
+    } else if (ev.button == MOUSE.MIDDLE_BUTTON) {
+        context_menu.hide();
+        tree_manager.clear_selection();
+        tree_manager.select(tgt_dom_id, tgt_path);
+        tree_manager.wrap_command(insert_nonterminal)();
+    } else if (ev.button == MOUSE.RIGHT_BUTTON) {
+        if (!tree_manager.has_selection()) {
+            tree_manager.select(tgt_dom_id, tgt_path);
+        }
+        let curr_sel = tree_manager.get_selection();
+        is_different_tree = curr_sel.index !== tgt_idx;
+        if (is_different_tree || selection_contains(curr_sel, tgt_path)) {
+            tree_manager.clear_selection();
+            tree_manager.select(tgt_dom_id, tgt_path);
+            context_menu.show(ev, curr_sel);
+        } else {
+            tree_manager.wrap_command(move_node)(tgt_path);
+            ev.stopPropagation();
+        }
+    }
+
+    if (tree_manager.has_selection()) {
+        last_sel = tree_manager.get_selection();
     }
     _.each(clickHooks, function (fn) {
-        fn(e.button);
+        fn(ev.button);
     });
-    e.stopPropagation();
+    ev.stopPropagation();
     last_event_was_mouse = true;
-    undoBarrier();
 }
 
-function handleNodeDoubleClick(ev) {
+function handle_double_click(ev) {
     let event = ev || window.event;
     let element = (event.target || event.srcElement);
 
@@ -607,56 +542,55 @@ function handleNodeDoubleClick(ev) {
         return true;
     }
 
-    clearSelection();
-    selectNode(last_wnode);
-    let sel = get_selection();
-
-    let node = sel.start.node;
+    let sel = clone_obj(last_sel);
+    dom_id = tree_manager.index_to_dom_id(last_sel.index);
+    tree_manager.clear_selection();
+    tree_manager.select(dom_id, last_sel.start);
+    // clone is by value, referential integrity is not maintained
+    let node = traverse_node_path(sel.aug_tree.tree, sel.start);
 
     if (!node.lemma || node.lemma === "") {
         console.error("double click handle on unexpected object", sel);
     }
 
+    let changed = false;
     if (element.classList && [... element.classList].includes("lemma-node")) {
         let res = window.prompt("Lemma", node.lemma);
         if (res  && res !== "" && res !== node.lemma) {
             node.lemma = res;
-            undoable_dom_swap(sel);
+            changed = true;
         }
     } else if (element.classList && [... element.classList].includes("exp-abbrev-node")) {
         let res = window.prompt("Expanded abbreviation", node.abbrev);
         if (res  && res !== "" && res !== node.abbrev) {
             node.abbrev = res;
-            undoable_dom_swap(sel);
+            changed = true;
         }
         console.log("handleNodeDoubleClick: edit abbrev");
     } else if (element.classList && [... element.classList].includes("exp-seg-node")) {
         let res = window.prompt("Expanded word segmentation", node.seg);
         if (res  && res !== "" && res !== node.seg) {
             node.lemma = res;
-            undoable_dom_swap(sel);
+            changed = true;
         }
     }
+    if (changed) {
+        tree_manager.update_tree(last_sel, sel);
+    }
+    return true;
 }
 
 // ========== Context Menu
 
-function showContextMenu(e) {
-    var element = e.target || e.srcElement;
-    if (element == document.getElementById("sn0")) {
-        clearSelection();
-        return;
-    }
-
-    let sel = get_selection();
-    if (sel.start.node.nonterminal) {
+function show_context_menu(sel) {
+    if (sel.node.nonterminal) {
         populate_context_menu_nonterminal(sel);
     } else {
         populate_context_menu_terminal(sel);
     }
 
-    var left = e.pageX;
-    var top = e.pageY;
+    var left = ev.pageX;
+    var top = ev.pageY;
     left = left + "px";
     top = top + "px";
 
@@ -674,8 +608,37 @@ function showContextMenu(e) {
     conm.css("visibility","visible");
 }
 
-function hideContextMenu() {
-    $("#conMenu").css("visibility","hidden");
+function showContextMenu(ev) {
+    var element = ev.target || ev.srcElement;
+    if (element == document.getElementById("sn0")) {
+        clearSelection();
+        return;
+    }
+
+    let sel = get_selection();
+    if (sel.node.nonterminal) {
+        populate_context_menu_nonterminal(sel);
+    } else {
+        populate_context_menu_terminal(sel);
+    }
+
+    var left = ev.pageX;
+    var top = ev.pageY;
+    left = left + "px";
+    top = top + "px";
+
+    var conl = $("#conLeft"),
+        conr = $("#conRight"),
+        conrr = $("#conRightest"),
+        conm = $("#conMenu");
+
+    $("#conMenu .conMenuColumn").each((idx) => { $(this).height("auto")});
+    let max_height = _.max($("#conMenu .conMenuColumn"), () => $(this).height());
+    $("#conMenu .conMenuColumn").each(() => $(this).height(max_height));
+
+    conm.css("left",left);
+    conm.css("top",top);
+    conm.css("visibility","visible");
 }
 
 // ========== Messages
@@ -752,135 +715,6 @@ function setInputFieldEnter(field, fn) {
 
 // ========== Selection
 
-/**
- * Get terminal or nonterminal element that is the immediate parent of elem
- */
-function get_selected_node_elem(elem) {
-    if (!elem) {
-        return false;
-    }
-
-    if (!(elem instanceof Node)) {
-        console.err("Selecting a non-node");
-    }
-    if (elem == document.getElementById("sn0")) {
-        clearSelection();
-        return false;
-    }
-
-    while (!$(elem).hasClass("snode") && elem != document) {
-        elem = elem.parentNode;
-    }
-
-    return elem;
-}
-
-/**
- * Select a node, and update the GUI to reflect that.
- *
- * @param {Node} node the node to be selected
- * @param {Boolean} force if true, force this node to be a secondary
- * selection, even if it wouldn't otherwise be.
- */
-function selectNode(sel_node, force) {
-    sel_node = get_selected_node_elem(sel_node);
-    if (!sel_node) {
-        return false;
-    }
-    let curr_startnode = startnode;
-
-    if (startnode === null) {
-        // no current selection
-        startnode = sel_node;
-    } else if (sel_node == startnode) {
-        // deselect first node
-        startnode = null;
-        if (endnode) {
-            startnode = endnode;
-            endnode = null;
-        }
-    } else {
-        if (startnode && (last_event_was_mouse || force)) {
-            // current selection exists
-            if (sel_node == endnode) {
-                // deselect last node
-                endnode = null;
-            } else if (endnode) {
-                // current selection is many siblings, either end was not selected
-                startnode = null;
-                endnode = null;
-            } else {
-                // startnode exists, new node selected
-                // enforce start and end nodes are siblings and make start point to leftmost sibling
-                let parent_children = [...startnode.parentElement.children];
-                let is_parent_inside_tree = startnode.parentElement.id !== "sn0";
-                if ( parent_children.includes(sel_node) && is_parent_inside_tree ) {
-                    let child_idx_startnode = parent_children.indexOf(startnode);
-                    let child_idx_sel = parent_children.indexOf(sel_node);
-                    let startnode_ = child_idx_startnode < child_idx_sel ? startnode : sel_node;
-                    let endnode_ = child_idx_startnode < child_idx_sel ? sel_node : startnode;
-                    startnode = startnode_;
-                    endnode = endnode_;
-                } else {
-                    // startnode exists, but new node was not a sibling
-                    startnode = null;
-                    endnode = null;
-                }
-            }
-        } else {
-            endnode = null;
-            startnode = sel_node;
-        }
-    }
-    if (last_startnode === null) {
-        last_startnode = startnode ? startnode : last_startnode;
-        last_startnode = curr_startnode ? curr_startnode : last_startnode;
-    } else {
-        last_startnode = curr_startnode ? curr_startnode : last_startnode;
-    }
-    updateSelection();
-}
-
-/**
- * Remove any selection of nodes.
- */
-function clearSelection() {
-    saveMetadata();
-    window.event.preventDefault();
-    startnode = null;
-    endnode = null;
-    updateSelection();
-    hideContextMenu();
-}
-
-function updateSelection() {
-    // update selection display
-    $('.snodesel').removeClass('snodesel');
-
-    let sel = get_selection();
-    if (sel.is_multi) {
-        let runner = startnode;
-        $(runner).addClass('snodesel');
-        while (runner != endnode) {
-            runner = runner.nextElementSibling;
-            $(runner).addClass('snodesel');
-        }
-    } else if (sel.start) {
-        $(sel.start.elem).addClass('snodesel');
-    }
-
-    updateMetadataEditor();
-    updateUrtext(sel);
-}
-
-function updateUrtext(sel) {
-    if (sel.start) {
-        let text = tree_to_text(sel.start.root_node);
-        $("#urtext").text(text).show();
-    } else {
-        $("#urtext").hide();
-    }
-}
 
 addStartupHook(function () {
     $("#urtext").hide();
@@ -889,7 +723,7 @@ addStartupHook(function () {
 /**
  * Scroll the page so that the first selected node is visible.
  */
-function scrollToShowSel() {
+function scrollToShowSel(elem) {
     function isTopVisible(elem) {
         var docViewTop = $(window).scrollTop();
         var docViewBottom = docViewTop + $(window).height();
@@ -897,8 +731,8 @@ function scrollToShowSel() {
 
         return ((elemTop <= docViewBottom) && (elemTop >= docViewTop));
     }
-    if (!isTopVisible(startnode)) {
-        window.scroll(0, $(startnode).offset().top - $(window).height() * 0.25);
+    if (!isTopVisible(elem)) {
+        window.scroll(0, $(elem).offset().top - $(window).height() * 0.25);
     }
 }
 
@@ -1183,247 +1017,247 @@ function leafEditorReplacement(label, word, lemma) {
     return $(replText);
 }
 
-/**
- * Edit the selected node
- *
- * If the selected node is a terminal, edit its label, and lemma.  The text is
- * available for editing if it is an empty node (trace, comment, etc.).  If a
- * non-terminal, edit the node label.
- */
-function displayRename() {
-    // Inner functions
-    function space(event) {
-        var element = (event.target || event.srcElement);
-        $(element).val($(element).val());
-        event.preventDefault();
-    }
-    function postChange(newNode) {
-        if (newNode) {
-            updateCssClass(newNode, oldClass);
-            startnode = endnode = null;
-            updateSelection();
-            document.body.onkeydown = handleKeyDown;
-            $("#sn0").mousedown(handleNodeClick);
-            $("#editpane").mousedown(clearSelection);
-            $("#butundo").prop("disabled", false);
-            $("#butredo").prop("disabled", false);
-            $("#butsave").prop("disabled", false);
-        }
-    }
+// /**
+//  * Edit the selected node
+//  *
+//  * If the selected node is a terminal, edit its label, and lemma.  The text is
+//  * available for editing if it is an empty node (trace, comment, etc.).  If a
+//  * non-terminal, edit the node label.
+//  */
+// function displayRename() {
+//     // Inner functions
+//     function space(event) {
+//         var element = (event.target || event.srcElement);
+//         $(element).val($(element).val());
+//         event.preventDefault();
+//     }
+//     function postChange(newNode) {
+//         if (newNode) {
+//             updateCssClass(newNode, oldClass);
+//             startnode = endnode = null;
+//             updateSelection();
+//             document.body.onkeydown = handleKeyDown;
+//             $("#sn0").mousedown(handleNodeClick);
+//             $("#editpane").mousedown(clearSelection);
+//             $("#butundo").prop("disabled", false);
+//             $("#butredo").prop("disabled", false);
+//             $("#butsave").prop("disabled", false);
+//         }
+//     }
 
-    // Begin code
-    if (!startnode || endnode) {
-        return;
-    }
-    undoBeginTransaction();
-    touchTree($(startnode));
-    document.body.onkeydown = null;
-    $("#sn0").unbind('mousedown');
-    $("#editpane").unbind('mousedown');
-    $("#butundo").prop("disabled", true);
-    $("#butredo").prop("disabled", true);
-    $("#butsave").prop("disabled", true);
-    var label = getLabel($(startnode));
-    var oldClass = parseLabel(label);
+//     // Begin code
+//     if (!startnode || endnode) {
+//         return;
+//     }
+//     undoBeginTransaction();
+//     touchTree($(startnode));
+//     document.body.onkeydown = null;
+//     $("#sn0").unbind('mousedown');
+//     $("#editpane").unbind('mousedown');
+//     $("#butundo").prop("disabled", true);
+//     $("#butredo").prop("disabled", true);
+//     $("#butsave").prop("disabled", true);
+//     var label = getLabel($(startnode));
+//     var oldClass = parseLabel(label);
 
-    if ($(startnode).children(".wnode").size() > 0) {
-        // this is a terminal
-        var word, lemma;
-        // is this right? we still want to allow editing of index, maybe?
-        var isLeaf = isLeafNode($(startnode));
-        if ($(startnode).children(".wnode").children(".lemma").size() > 0) {
-            var preword = $.trim($(startnode).children().first().text());
-            preword = preword.split("-");
-            lemma = preword.pop();
-            word = preword.join("-");
-        } else {
-            word = $.trim($(startnode).children().first().text());
-        }
+//     if ($(startnode).children(".wnode").size() > 0) {
+//         // this is a terminal
+//         var word, lemma;
+//         // is this right? we still want to allow editing of index, maybe?
+//         var isLeaf = isLeafNode($(startnode));
+//         if ($(startnode).children(".wnode").children(".lemma").size() > 0) {
+//             var preword = $.trim($(startnode).children().first().text());
+//             preword = preword.split("-");
+//             lemma = preword.pop();
+//             word = preword.join("-");
+//         } else {
+//             word = $.trim($(startnode).children().first().text());
+//         }
 
-        $(startnode).replaceWith(leafEditorHtml(label, word, lemma));
+//         $(startnode).replaceWith(leafEditorHtml(label, word, lemma));
 
-        $("#leafphrasebox,#leaftextbox,#leaflemmabox").keydown(
-            function(event) {
-                var replText, replNode;
-                if (event.keyCode == 32) {
-                    space(event);
-                }
-                if (event.keyCode == 27) {
-                    replNode = leafEditorReplacement(label, word, lemma);
-                    $("#leafeditor").replaceWith(replNode);
-                    postChange(replNode);
-                    undoAbortTransaction();
-                }
-                if (event.keyCode == 13) {
-                    var newlabel = $("#leafphrasebox").val().toUpperCase();
-                    var newword = $("#leaftextbox").val();
-                    var newlemma;
-                    if (lemma) {
-                        newlemma = $('#leaflemmabox').val();
-                    }
+//         $("#leafphrasebox,#leaftextbox,#leaflemmabox").keydown(
+//             function(event) {
+//                 var replText, replNode;
+//                 if (event.keyCode == 32) {
+//                     space(event);
+//                 }
+//                 if (event.keyCode == 27) {
+//                     replNode = leafEditorReplacement(label, word, lemma);
+//                     $("#leafeditor").replaceWith(replNode);
+//                     postChange(replNode);
+//                     undoAbortTransaction();
+//                 }
+//                 if (event.keyCode == 13) {
+//                     var newlabel = $("#leafphrasebox").val().toUpperCase();
+//                     var newword = $("#leaftextbox").val();
+//                     var newlemma;
+//                     if (lemma) {
+//                         newlemma = $('#leaflemmabox').val();
+//                     }
 
-                    if (isLeafNode) {
-                        if (typeof testValidLeafLabel !== "undefined") {
-                            if (!testValidLeafLabel(newlabel)) {
-                                displayWarning("Not a valid leaf label: '" +
-                                               newlabel + "'.");
-                                return;
-                            }
-                        }
-                    } else {
-                        if (typeof testValidPhraseLabel !== "undefined") {
-                            if (!testValidPhraseLabel(newlabel)) {
-                                displayWarning("Not a valid phrase label: '" +
-                                               newlabel + "'.");
-                                return;
-                            }
-                        }
-                    }
-                    if (newword + newlemma === "") {
-                        displayWarning("Cannot create an empty leaf.");
-                        return;
-                    }
-                    replNode = leafEditorReplacement(newlabel, newword,
-                                                     newlemma);
-                    $("#leafeditor").replaceWith(replNode);
-                    postChange(replNode);
-                    undoEndTransaction();
-                    undoBarrier();
-                }
-                if (event.keyCode == 9) {
-                    var element = (event.target || event.srcElement);
-                    if ($("#leafphrasebox").is(element)) {
-                        if (!$("#leaftextbox").attr("disabled")) {
-                            $("#leaftextbox").focus();
-                        } else if ($("#leaflemmabox").length == 1) {
-                            $("#leaflemmabox").focus();
-                        }
-                    } else if ($("#leaftextbox").is(element)) {
-                        if ($("#leaflemmabox").length == 1) {
-                            $("#leaflemmabox").focus();
-                        } else {
-                            $("#leafphrasebox").focus();
-                        }
-                    } else if ($("#leaflemmabox").is(element)) {
-                        $("#leafphrasebox").focus();
-                    }
-                    event.preventDefault();
-                }
-            }).mouseup(function editLeafClick(e) {
-                e.stopPropagation();
-            });
-        setTimeout(function(){ $("#leafphrasebox").focus(); }, 10);
-    } else {
-        // this is not a terminal
-        var editor = $("<input id='labelbox' class='labeledit' " +
-                       "type='text' value='" + label + "' />");
-        var origNode = $(startnode);
-        var isWordLevelConj =
-                origNode.children(".snode").children(".snode").size() === 0 &&
-                // TODO: make configurable
-                origNode.children(".CONJ") .size() > 0;
-        textNode(origNode).replaceWith(editor);
-        $("#labelbox").keydown(
-            function(event) {
-                if (event.keyCode == 9) {
-                    event.preventDefault();
-                }
-                if (event.keyCode == 32) {
-                    space(event);
-                }
-                if (event.keyCode == 27) {
-                    $("#labelbox").replaceWith(label + " ");
-                    postChange(origNode);
-                    undoAbortTransaction();
-                }
-                if (event.keyCode == 13) {
-                    var newphrase = $("#labelbox").val().toUpperCase();
-                    if (typeof testValidPhraseLabel !== "undefined") {
-                        if (!(testValidPhraseLabel(newphrase) ||
-                              (typeof testValidLeafLabel !== "undefined" &&
-                               isWordLevelConj &&
-                               testValidLeafLabel(newphrase)))) {
-                            displayWarning("Not a valid phrase label: '" +
-                                           newphrase + "'.");
-                            return;
-                        }
-                    }
-                    $("#labelbox").replaceWith(newphrase + " ");
-                    postChange(origNode);
-                    undoEndTransaction();
-                    undoBarrier();
-                }
-            }).mouseup(function editNonLeafClick(e) {
-                e.stopPropagation();
-            });
-        setTimeout(function(){ $("#labelbox").focus(); }, 10);
-    }
-}
-displayRename.async = true;
+//                     if (isLeafNode) {
+//                         if (typeof testValidLeafLabel !== "undefined") {
+//                             if (!testValidLeafLabel(newlabel)) {
+//                                 displayWarning("Not a valid leaf label: '" +
+//                                                newlabel + "'.");
+//                                 return;
+//                             }
+//                         }
+//                     } else {
+//                         if (typeof testValidPhraseLabel !== "undefined") {
+//                             if (!testValidPhraseLabel(newlabel)) {
+//                                 displayWarning("Not a valid phrase label: '" +
+//                                                newlabel + "'.");
+//                                 return;
+//                             }
+//                         }
+//                     }
+//                     if (newword + newlemma === "") {
+//                         displayWarning("Cannot create an empty leaf.");
+//                         return;
+//                     }
+//                     replNode = leafEditorReplacement(newlabel, newword,
+//                                                      newlemma);
+//                     $("#leafeditor").replaceWith(replNode);
+//                     postChange(replNode);
+//                     undoEndTransaction();
+//                     undoBarrier();
+//                 }
+//                 if (event.keyCode == 9) {
+//                     var element = (event.target || event.srcElement);
+//                     if ($("#leafphrasebox").is(element)) {
+//                         if (!$("#leaftextbox").attr("disabled")) {
+//                             $("#leaftextbox").focus();
+//                         } else if ($("#leaflemmabox").length == 1) {
+//                             $("#leaflemmabox").focus();
+//                         }
+//                     } else if ($("#leaftextbox").is(element)) {
+//                         if ($("#leaflemmabox").length == 1) {
+//                             $("#leaflemmabox").focus();
+//                         } else {
+//                             $("#leafphrasebox").focus();
+//                         }
+//                     } else if ($("#leaflemmabox").is(element)) {
+//                         $("#leafphrasebox").focus();
+//                     }
+//                     event.preventDefault();
+//                 }
+//             }).mouseup(function editLeafClick(e) {
+//                 e.stopPropagation();
+//             });
+//         setTimeout(function(){ $("#leafphrasebox").focus(); }, 10);
+//     } else {
+//         // this is not a terminal
+//         var editor = $("<input id='labelbox' class='labeledit' " +
+//                        "type='text' value='" + label + "' />");
+//         var origNode = $(startnode);
+//         var isWordLevelConj =
+//                 origNode.children(".snode").children(".snode").size() === 0 &&
+//                 // TODO: make configurable
+//                 origNode.children(".CONJ") .size() > 0;
+//         textNode(origNode).replaceWith(editor);
+//         $("#labelbox").keydown(
+//             function(event) {
+//                 if (event.keyCode == 9) {
+//                     event.preventDefault();
+//                 }
+//                 if (event.keyCode == 32) {
+//                     space(event);
+//                 }
+//                 if (event.keyCode == 27) {
+//                     $("#labelbox").replaceWith(label + " ");
+//                     postChange(origNode);
+//                     undoAbortTransaction();
+//                 }
+//                 if (event.keyCode == 13) {
+//                     var newphrase = $("#labelbox").val().toUpperCase();
+//                     if (typeof testValidPhraseLabel !== "undefined") {
+//                         if (!(testValidPhraseLabel(newphrase) ||
+//                               (typeof testValidLeafLabel !== "undefined" &&
+//                                isWordLevelConj &&
+//                                testValidLeafLabel(newphrase)))) {
+//                             displayWarning("Not a valid phrase label: '" +
+//                                            newphrase + "'.");
+//                             return;
+//                         }
+//                     }
+//                     $("#labelbox").replaceWith(newphrase + " ");
+//                     postChange(origNode);
+//                     undoEndTransaction();
+//                     undoBarrier();
+//                 }
+//             }).mouseup(function editNonLeafClick(e) {
+//                 e.stopPropagation();
+//             });
+//         setTimeout(function(){ $("#labelbox").focus(); }, 10);
+//     }
+// }
+// displayRename.async = true;
 
-/**
- * Edit the lemma of a terminal node.
- */
-function editLemma() {
-    // Inner functions
-    function space(event) {
-        var element = (event.target || event.srcElement);
-        $(element).val($(element).val());
-        event.preventDefault();
-    }
-    function postChange() {
-        startnode = null; endnode = null;
-        updateSelection();
-        document.body.onkeydown = handleKeyDown;
-        $("#sn0").mousedown(handleNodeClick);
-        $("#undo").attr("disabled", false);
-        $("#redo").attr("disabled", false);
-        $("#save").attr("disabled", false);
-        undoBarrier();
-    }
+// /**
+//  * Edit the lemma of a terminal node.
+//  */
+// function editLemma() {
+//     // Inner functions
+//     function space(event) {
+//         var element = (event.target || event.srcElement);
+//         $(element).val($(element).val());
+//         event.preventDefault();
+//     }
+//     function postChange() {
+//         startnode = null; endnode = null;
+//         updateSelection();
+//         document.body.onkeydown = handleKeyDown;
+//         $("#sn0").mousedown(handleNodeClick);
+//         $("#undo").attr("disabled", false);
+//         $("#redo").attr("disabled", false);
+//         $("#save").attr("disabled", false);
+//         undoBarrier();
+//     }
 
-    // Begin code
-    var childLemmata = $(startnode).children(".wnode").children(".lemma");
-    if (!startnode || endnode || childLemmata.size() != 1) {
-        return;
-    }
-    document.body.onkeydown = null;
-    $("#sn0").unbind('mousedown');
-    undoBeginTransaction();
-    touchTree($(startnode));
-    $("#undo").attr("disabled", true);
-    $("#redo").attr("disabled", true);
-    $("#save").attr("disabled", true);
+//     // Begin code
+//     var childLemmata = $(startnode).children(".wnode").children(".lemma");
+//     if (!startnode || endnode || childLemmata.size() != 1) {
+//         return;
+//     }
+//     document.body.onkeydown = null;
+//     $("#sn0").unbind('mousedown');
+//     undoBeginTransaction();
+//     touchTree($(startnode));
+//     $("#undo").attr("disabled", true);
+//     $("#redo").attr("disabled", true);
+//     $("#save").attr("disabled", true);
 
-    var lemma = $(startnode).children(".wnode").children(".lemma").text();
-    lemma = lemma.substring(1);
-    var editor=$("<span id='leafeditor' class='wnode'><input " +
-                 "id='leaflemmabox' class='labeledit' type='text' value='" +
-                 lemma + "' /></span>");
-    $(startnode).children(".wnode").children(".lemma").replaceWith(editor);
-    $("#leaflemmabox").keydown(
-        function(event) {
-            if (event.keyCode == 9) {
-                event.preventDefault();
-            }
-            if (event.keyCode == 32) {
-                space(event);
-            }
-            if (event.keyCode == 13) {
-                var newlemma = $('#leaflemmabox').val();
-                newlemma = newlemma.replace("<","&lt;");
-                newlemma = newlemma.replace(">","&gt;");
-                newlemma = newlemma.replace(/'/g,"&#39;");
+//     var lemma = $(startnode).children(".wnode").children(".lemma").text();
+//     lemma = lemma.substring(1);
+//     var editor=$("<span id='leafeditor' class='wnode'><input " +
+//                  "id='leaflemmabox' class='labeledit' type='text' value='" +
+//                  lemma + "' /></span>");
+//     $(startnode).children(".wnode").children(".lemma").replaceWith(editor);
+//     $("#leaflemmabox").keydown(
+//         function(event) {
+//             if (event.keyCode == 9) {
+//                 event.preventDefault();
+//             }
+//             if (event.keyCode == 32) {
+//                 space(event);
+//             }
+//             if (event.keyCode == 13) {
+//                 var newlemma = $('#leaflemmabox').val();
+//                 newlemma = newlemma.replace("<","&lt;");
+//                 newlemma = newlemma.replace(">","&gt;");
+//                 newlemma = newlemma.replace(/'/g,"&#39;");
 
-                $("#leafeditor").replaceWith("<span class='lemma'>-" +
-                                             newlemma + "</span>");
-                postChange();
-            }
-            // TODO: escape
-        });
-    setTimeout(function(){ $("#leaflemmabox").focus(); }, 10);
-}
-editLemma.async = true;
+//                 $("#leafeditor").replaceWith("<span class='lemma'>-" +
+//                                              newlemma + "</span>");
+//                 postChange();
+//             }
+//             // TODO: escape
+//         });
+//     setTimeout(function(){ $("#leaflemmabox").focus(); }, 10);
+// }
+// editLemma.async = true;
 
 // ========== Search
 
@@ -1858,467 +1692,9 @@ function toggleCollapsed() {
 
 // ========== Movement
 
-/**
- * Move the selected node(s) to a new position.
- *
- * The movement operation must not change the text of the token.
- *
- * Empty categories are not allowed to be moved as a leaf.  However, a
- * non-terminal containing only empty categories can be moved.
- *
- * @param {Node} parent the parent node to move selection under
- *
- * @returns {Boolean} whether the operation was successful
- */
-function moveNode(parent) {
-    var parent_ip = $(startnode).parents("#sn0>.snode,#sn0").first();
-    var other_parent = $(parent).parents("#sn0>.snode,#sn0").first();
-    if (parent == document.getElementById("sn0") ||
-        !parent_ip.is(other_parent)) {
-        parent_ip = $("#sn0");
-    }
-    var parent_before;
-    var textbefore = currentText(parent_ip);
-    var nodeMoved;
-    if (!isPossibleTarget(parent) || // can't move under a tag node
-        $(startnode).parent().children().length == 1 || // can't move an only child
-        $(parent).parents().is(startnode) || // can't move under one's own child
-        isEmptyNode(startnode) // can't move an empty leaf node by itself
-       )
-    {
-        clearSelection();
-        return false;
-    } else if ($(startnode).parents().is(parent)) {
-        // move up if moving to a node that is already my parent
-        if ($(startnode).parent().children().first().is(startnode)) {
-            if ($(startnode).parentsUntil(parent).slice(0,-1).
-                filter(":not(:first-child)").size() > 0) {
-                clearSelection();
-                return false;
-            }
-            if (parent == document.getElementById("sn0")) {
-                touchTree($(startnode));
-                registerNewRootTree($(startnode));
-            } else {
-                touchTree($(startnode));
-            }
-            $(startnode).insertBefore($(parent).children().filter(
-                                                 $(startnode).parents()));
-            if (currentText(parent_ip) != textbefore) {
-                alert("failed what should have been a strict test");
-            }
-        } else if ($(startnode).parent().children().last().is(startnode)) {
-            if ($(startnode).parentsUntil(parent).slice(0,-1).
-                filter(":not(:last-child)").size() > 0) {
-                clearSelection();
-                return false;
-            }
-            if (parent == document.getElementById("sn0")) {
-                touchTree($(startnode));
-                registerNewRootTree($(startnode));
-            } else {
-                touchTree($(startnode));
-            }
-            $(startnode).insertAfter($(parent).children().
-                                     filter($(startnode).parents()));
-            if (currentText(parent_ip) != textbefore) {
-                alert("failed what should have been a strict test");
-            }
-        } else {
-            // cannot move from this position
-            clearSelection();
-            return false;
-        }
-    } else {
-        // otherwise move under my sister
-        var tokenMerge = isRootNode( $(startnode) );
-        var maxindex = maxIndex(getTokenRoot($(parent)));
-        var movednode = $(startnode);
-
-        // NOTE: currently there are no more stringent checks below; if that
-        // changes, we might want to demote this
-        parent_before = parent_ip.clone();
-
-        // where a and b are DOM elements (not jquery-wrapped),
-        // a.compareDocumentPosition(b) returns an integer.  The first (counting
-        // from 0) bit is set if B precedes A, and the second bit is set if A
-        // precedes B.
-
-        // TODO: perhaps here and in the immediately following else if it is
-        // possible to simplify and remove the compareDocumentPosition call,
-        // since the jQuery subsumes it
-        if (parent.compareDocumentPosition(startnode) & 0x4) {
-            // check whether the nodes are adjacent.  Ideally, we would like
-            // to say selfAndParentsUntil, but no such jQuery fn exists, thus
-            // necessitating the disjunction.
-            // TODO: too strict
-            // &&
-            // $(startnode).prev().is(
-            //     $(parent).parentsUntil(startnode.parentNode).last()) ||
-            // $(startnode).prev().is(parent)
-
-            // parent precedes startnode
-            undoBeginTransaction();
-            if (tokenMerge) {
-                registerDeletedRootTree($(startnode));
-                touchTree($(parent));
-                // TODO: this will bomb if we are merging more than 2 tokens
-                // by multiple selection.
-                addToIndices(movednode, maxindex);
-            } else {
-                touchTree($(startnode));
-                touchTree($(parent));
-            }
-            movednode.appendTo(parent);
-            if (currentText(parent_ip) != textbefore)  {
-                undoAbortTransaction();
-                parent_ip.replaceWith(parent_before);
-                if (parent_ip.attr("id") == "sn0") {
-                    $("#sn0").mousedown(handleNodeClick);
-                }
-                clearSelection();
-                return false;
-            } else {
-                undoEndTransaction();
-            }
-        } else if ((parent.compareDocumentPosition(startnode) & 0x2)) {
-            // &&
-            // $(startnode).next().is(
-            //     $(parent).parentsUntil(startnode.parentNode).last()) ||
-            // $(startnode).next().is(parent)
-
-            // startnode precedes parent
-            undoBeginTransaction();
-            if (tokenMerge) {
-                registerDeletedRootTree($(startnode));
-                touchTree($(parent));
-                addToIndices(movednode, maxindex);
-            } else {
-                touchTree($(startnode));
-                touchTree($(parent));
-            }
-            movednode.insertBefore($(parent).children().first());
-            if (currentText(parent_ip) != textbefore) {
-                undoAbortTransaction();
-                parent_ip.replaceWith(parent_before);
-                if (parent_ip == "sn0") {
-                    $("#sn0").mousedown(handleNodeClick);
-                }
-                clearSelection();
-                return false;
-            } else {
-                undoEndTransaction();
-            }
-        } // TODO: conditional branches not exhaustive
-    }
-    clearSelection();
-    return true;
-}
-
-/**
- * Move several nodes.
- *
- * The two selected nodes must be sisters, and they and all intervening sisters
- * will be moved as a unit.  Calls {@link moveNode} to do the heavy lifting.
- *
- * @param {Node} parent the parent to move the selection under
- */
-function moveNodes(parent) {
-    if (!startnode || !endnode) {
-        return;
-    }
-    undoBeginTransaction();
-    touchTree($(startnode));
-    touchTree($(parent));
-    if (startnode.compareDocumentPosition(endnode) & 0x2) {
-        // endnode precedes startnode, reverse them
-        var temp = startnode;
-        startnode = endnode;
-        endnode = temp;
-    }
-    if (startnode.parentNode == endnode.parentNode) {
-        // collect startnode and its sister up until endnode
-        $(startnode).add($(startnode).nextUntil(endnode)).
-            add(endnode).
-            wrapAll('<div xxx="newnode" class="snode">XP</div>');
-
-    } else {
-        return; // they are not sisters
-    }
-    var toselect = $(".snode[xxx=newnode]").first();
-    toselect = toselect.get(0);
-    // BUG when making XP and then use context menu: TODO XXX
-
-    startnode = toselect;
-    var res = ignoringUndo(function () { moveNode(parent); });
-    if (res) {
-        undoEndTransaction();
-    } else {
-        undoAbortTransaction();
-    }
-    startnode = $(".snode[xxx=newnode]").first().get(0);
-    endnode = undefined;
-    pruneNode();
-    clearSelection();
-}
-
 // ========== Creation
 
-/**
- * Create a leaf node before the selected node.
- *
- * Uses heuristic to determine whether the new leaf is to be a trace, empty
- * subject, etc.
- */
-function leafBefore() {
-    makeLeaf(true);
-}
-
-/**
- * Create a leaf node after the selected node.
- *
- * Uses heuristic to determine whether the new leaf is to be a trace, empty
- * subject, etc.
- */
-function leafAfter() {
-    makeLeaf(false);
-}
-
-// TODO: the hardcoding of defaults in this function is ugly.  We should
-// supply a default heuristic fn to try to guess these, then allow
-// settings.js to override it.
-
-// TODO: maybe put the heuristic into leafbefore/after, and leave this fn clean?
-
-/**
- * Create a leaf node adjacent to the selection, or a given target.
- *
- * @param {Boolean} before whether to create the node before or after selection
- * @param {String} label the label to give the new node
- * @param {String} word the text to give the new node
- * @param {Node} target where to put the new node (default: selected node)
- */
-function makeLeaf(before, label, word, target) {
-    if (!(target || startnode)) return;
-
-    if (!label) {
-        if (before) {
-            label = "NP-SBJ";
-        } else {
-            label = "VB";
-        }
-    }
-    if (!word) {
-        if (before) {
-            word = "*con*";
-        } else {
-            word = "*";
-        }
-    }
-    if (!target) {
-        target = startnode;
-    }
-
-    undoBeginTransaction();
-    var isRootLevel = false;
-    if (isRootNode($(target))) {
-        isRootLevel = true;
-    } else {
-        touchTree($(target));
-    }
-
-    var lemma = false;
-    var temp = word.split("-");
-    if (temp.length > 1) {
-        lemma = temp.pop();
-        word = temp.join("-");
-    }
-
-    var doCoindex = false;
-
-    if (endnode) {
-        var startRoot = getTokenRoot($(startnode));
-        var endRoot = getTokenRoot($(endnode));
-        if (startRoot == endRoot) {
-            word = "*ICH*";
-            label = getLabel($(endnode));
-            if (label.startsWith("W")) {
-                word = "*T*";
-                label = label.substr(1).replace(/-[0-9]+$/, "");
-            } else if (label.split("-").indexOf("CL") > -1) {
-                word = "*CL*";
-                label = getLabel($(endnode)).replace("-CL", "");
-                if (label.substring(0,3) == "PRO") {
-                    label = "NP";
-                }
-            }
-            doCoindex = true;
-        } else { // abort if selecting from different tokens
-            undoAbortTransaction();
-            return;
-        }
-    }
-
-    var newleaf = "<div class='snode " + label + "'>" + label +
-        "<span class='wnode'>" + word;
-    if (lemma) {
-        newleaf += "<span class='lemma'>-" + lemma +
-            "</span>";
-    }
-    newleaf += "</span></div>\n";
-    newleaf = $(newleaf);
-    if (before) {
-        newleaf.insertBefore(target);
-    } else {
-        newleaf.insertAfter(target);
-    }
-    if (doCoindex) {
-        startnode = newleaf.get(0);
-        coIndex();
-    }
-    startnode = null;
-    endnode = null;
-    selectNode(newleaf.get(0));
-    updateSelection();
-    if (isRootLevel) {
-        registerNewRootTree(newleaf);
-    }
-    undoEndTransaction();
-}
-
-/**
- * Create a phrasal node.
- *
- * The node will dominate the selected node or (if two sisters are selected)
- * the selection and all intervening sisters.
- *
- * @param {String} [label] the label to give the new node (default: XP)
- */
-function makeNode(label) {
-    // check if something is selected
-    if (!startnode) {
-        return;
-    }
-    if (!label) {
-        label = "XP";
-    }
-    var rootLevel = isRootNode($(startnode));
-    undoBeginTransaction();
-    if (rootLevel) {
-        registerDeletedRootTree($(startnode));
-    } else {
-        touchTree($(startnode));
-    }
-    var parent_ip = $(startnode).parents("#sn0>.snode,#sn0").first();
-    var parent_before = parent_ip.clone();
-    var newnode = '<div class="snode ' + label + '">' + label + ' </div>\n';
-    // make end = start if only one node is selected
-    if (!endnode) {
-        // if only one node, wrap around that one
-        $(startnode).wrapAll(newnode);
-    } else {
-        if (startnode.compareDocumentPosition(endnode) & 0x2) {
-            // startnode and endnode in wrong order, reverse them
-            var temp = startnode;
-            startnode = endnode;
-            endnode = temp;
-        }
-
-        // check if they are really sisters XXXXXXXXXXXXXXX
-        if ($(startnode).siblings().is(endnode)) {
-            // then, collect startnode and its sister up until endnode
-            var oldtext = currentText(parent_ip);
-            $(startnode).add($(startnode).nextUntil(endnode)).add(
-                endnode).wrapAll(newnode);
-            // undo if this messed up the text order
-            if(currentText(parent_ip) != oldtext) {
-                // TODO: is this plausible? can we remove the check?
-                parent_ip.replaceWith(parent_before);
-                undoAbortTransaction();
-                clearSelection();
-                return;
-            }
-        } else {
-            return;
-        }
-    }
-
-    var toselect = $(startnode).parent();
-
-    startnode = null;
-    endnode = null;
-
-    if (rootLevel) {
-        registerNewRootTree(toselect);
-    }
-
-    undoEndTransaction();
-
-    selectNode(toselect.get(0));
-    updateSelection();
-}
-
 // ========== Deletion
-
-/**
- * Delete a node.
- *
- * The node can only be deleted if doing so does not affect the text, i.e. it
- * directly dominates no non-empty terminals.
- */
-function pruneNode() {
-    if (startnode && !endnode) {
-        var deltext = $(startnode).children().first().text();
-        if (isLeafNode(startnode) && isEmpty(deltext)) {
-            // it is ok to delete leaf if it is empty/trace
-            if (isRootNode($(startnode))) {
-                // perversely, it is possible to have a leaf node at the root
-                // of a file.
-                registerDeletedRootTree($(startnode));
-            } else {
-                touchTree($(startnode));
-            }
-            var idx = getIndex($(startnode));
-            if (idx > 0) {
-                var root = $(getTokenRoot($(startnode)));
-                var sameIdx = root.find('.snode').filter(function () {
-                    return getIndex($(this)) == idx;
-                }).not(startnode);
-                if (sameIdx.length == 1) {
-                    var osn = startnode;
-                    startnode = sameIdx.get(0);
-                    coIndex();
-                    startnode = osn;
-                }
-            }
-            $(startnode).remove();
-            startnode = endnode = null;
-            updateSelection();
-            return;
-        } else if (isLeafNode(startnode)) {
-            // but other leaves are not deleted
-            return;
-        } else if (startnode == document.getElementById("sn0")) {
-            return;
-        }
-
-        var toselect = $(startnode).children().first();
-        if (isRootNode($(startnode))) {
-            // TODO: ugly and expensive. the alternative is adding a fourth
-            // data type to the undo list, I think.
-            registerDeletedRootTree($(startnode));
-            $(startnode).children().each(function () {
-                registerNewRootTree($(this));
-            });
-        } else {
-            touchTree($(startnode));
-        }
-        $(startnode).replaceWith($(startnode).children());
-        startnode = endnode = null;
-        selectNode(toselect.get(0));
-        updateSelection();
-    }
-}
 
 // ========== Label manipulation
 
@@ -2519,113 +1895,7 @@ function save(e) {
 
 var validatingCurrently = false;
 
-function validateTrees(e) {
-    if (!validatingCurrently) {
-        validatingCurrently = true;
-        displayInfo("Validating...");
-        setTimeout(function () {
-            // TODO: since this is a settimeout, do we need to also make it async?
-            validateTreesSync(true, e.shiftKey);
-        }, 0);
-    }
-}
-
-function validateTreesSync(async, shift) {
-    var toValidate = toLabeledBrackets($("#editpane"));
-    $.ajax("/doValidate",
-           { type: 'POST',
-             url: "/doValidate",
-             data: { trees: toValidate,
-                     validator: $("#validatorsSelect").val(),
-                     shift: shift
-                   },
-             success: validateHandler,
-             async: async,
-             dataType: "json"
-           });
-}
-
-function validateHandler(data) {
-    if (data.result == "success") {
-        displayInfo("Validate success.");
-        $("#editpane").html(data.html);
-        assignEvents();
-        prepareUndoIds();
-    } else if (data.result == "failure") {
-        displayWarning("Validate failed: " + data.reason);
-    }
-    validatingCurrently = false;
-    // TODO(AWE): more nuanced distinction between validation found errors and
-    // validation script itself contains errors
-}
-
-function nextValidationError() {
-    var node = scrollToNext(".snode[class*=\"FLAG\"],.snode[class$=\"FLAG\"]");
-    selectNode(node.get(0));
-}
-
 // ========== Advancing through the file
-
-function nextTree(e) {
-    e = e || {};
-    var find = undefined;
-    if (e.shiftKey) find = "-FLAG";
-    advanceTree(find, false, 1);
-}
-
-function prevTree(e) {
-    e = e || {};
-    var find = undefined;
-    if (e.shiftKey) find = "-FLAG";
-    advanceTree(find, false, -1);
-}
-
-function advanceTree(find, async, offset) {
-    var theTrees = toLabeledBrackets($("#editpane"));
-    displayInfo("Fetching tree...");
-    return $.ajax("/advanceTree",
-                  { async: async,
-                    success: function(res) {
-                        if (res.result == "failure") {
-                            displayWarning("Fetching tree failed: " + res.reason);
-                        } else {
-                            // TODO: what to do about the save warning
-                            $("#editpane").html(res.tree);
-                            documentReadyHandler();
-                            nukeUndo();
-                            currentIndex = res['treeIndexStart'] + 1;
-                            displayInfo("Tree " + currentIndex + " fetched.");
-                            displayTreeIndex("Editing tree #" + currentIndex +
-                                             " out of " + res['totalTrees']);
-                        }
-                    },
-                    dataType: "json",
-                    type: "POST",
-                    data: { trees: theTrees,
-                            find: find,
-                            offset: offset
-                          }});
-}
-
-function displayTreeIndex(text) {
-    $("#treeIndexDisplay").text(text);
-}
-
-// TODO: test post-merge
-function goToTree() {
-    function goTo() {
-        var i;
-        var treeIndex = $("#gotoInput").val();
-        advanceTree(undefined, false, treeIndex - currentIndex);
-        hideDialogBox();
-    }
-    var html = "Enter the index of the tree you'd like to jump to: \
-<input type='text' id='gotoInput' value=' ' /><div id='dialogButtons'><input type='button' id='gotoButton'\
- value='GoTo' /></div>";
-    showDialogBox("GoTo Tree", html, goTo);
-    $("#gotoButton").click(goTo);
-    $("#gotoInput").focus();
-}
 
 // ========== Event logging and idle
 
@@ -2756,461 +2026,50 @@ function quitServer(e, force) {
 
 // TODO: organize this code
 
-var undoMap,
-    undoNewTrees,
-    undoDeletedTrees,
-    undoStack = [],
-    redoStack = [],
-    undoTransactionStack = [];
-
-var idNumber = 1;
-
-function prepareUndoIds() {
-    $("#sn0>.snode").map(function () {
-        $(this).attr("id", "id" + idNumber);
-        idNumber++;
-    });
-    nukeUndo();
-}
-
-addStartupHook(prepareUndoIds);
-
-/**
- * Reset the undo system.
- *
- * This function removes any intermediate state the undo system has stored; it
- * does not affect the undo history.
- * @private
- */
-function resetUndo() {
-    undoMap = {};
-    undoNewTrees = [];
-    undoDeletedTrees = [];
-    undoTransactionStack = [];
-}
-
-/**
- * Reset the undo system entirely.
- *
- * This function zeroes out any undo history.
- */
-function nukeUndo() {
-    resetUndo();
-    undoStack = [];
-    redoStack = [];
-}
-
-/**
- * Record an undo step.
- * @private
- */
-function undoBarrier() {
-    if (_.size(undoMap) === 0 &&
-        _.size(undoNewTrees) === 0 &&
-        _.size(undoDeletedTrees) === 0) {
-        return;
-    }
-    undoStack.push({
-        map: undoMap,
-        newTr: undoNewTrees,
-        delTr: undoDeletedTrees
-    });
-    resetUndo();
-    redoStack = [];
-}
-
-/**
- * Begin an undo transaction.
- *
- * This function MUST be matched by a call to either `undoEndTransaction`
- * (which keeps all intermediate steps since the start call) or
- * `undoAbortTransaction` (which discards said steps).
- */
-function undoBeginTransaction() {
-    undoTransactionStack.push({
-        map: undoMap,
-        newTr: undoNewTrees,
-        delTr: undoDeletedTrees
-    });
-}
-
-/**
- * End an undo transaction, keeping its changes
- */
-function undoEndTransaction() {
-    undoTransactionStack.pop();
-}
-
-/**
- * End an undo transaction, discarding its changes
- */
-function undoAbortTransaction() {
-    var t = undoTransactionStack.pop();
-    undoMap = t.map;
-    undoNewTrees = t.newTr;
-    undoDeletedTrees = t.delTr;
-}
-
-/**
- * Execute a function, discarding whatever effects it has on the undo system.
- *
- * @param {Function} fn a function to execute
- *
- * @returns the result of `fn`
- */
-function ignoringUndo(fn) {
-    // a bit of a grim hack, but it works
-    undoBeginTransaction();
-    var res = fn();
-    undoAbortTransaction();
-    return res;
-}
-
-/**
- * Inform the undo system that changes are being made.
- *
- * @param {jQuery} node the node in which changes are being made
- */
-function touchTree(node) {
-    var root = $(getTokenRoot(node));
-    if (!undoMap[root.attr("id")]) {
-        undoMap[root.attr("id")] = root.clone();
-    }
-}
+// addStartupHook(prepareUndoIds);
 
 /**
  * Inform the undo system of the addition of a new tree at the root level.
  *
  * @param {jQuery} tree the tree being added
  */
-function registerNewRootTree(tree) {
-    var newid = "id" + idNumber;
-    idNumber++;
-    undoNewTrees.push(newid);
-    tree.attr("id", newid);
-}
+// function registerNewRootTree(tree) {
+//     var newid = "id" + idNumber;
+//     idNumber++;
+//     undoNewTrees.push(newid);
+//     tree.attr("id", newid);
+// }
 
 /**
  * Inform the undo system of a tree's removal at the root level
  *
  * @param {jQuery} tree the tree being removed
  */
-function registerDeletedRootTree(tree) {
-    var prev = tree.prev();
-    if (prev.length === 0) {
-        prev = null;
-    }
-    undoDeletedTrees.push({
-        tree: tree.clone(),
-        before: prev && prev.attr("id")
-    });
-}
-
-/**
- * Perform an undo operation.
- *
- * This is a worker function, wrapped by `undo` and `redo`.
- * @private
- */
-function doUndo(undoData) {
-    var map = {},
-        newTr = [],
-        delTr = [];
-
-    _.each(undoData.map, function(v, k) {
-        var theNode = $("#" + k);
-        map[k] = theNode.clone();
-        theNode.replaceWith(v);
-    });
-
-    // Add back the deleted trees before removing the new trees, just in case
-    // the insertion point of one of these is going to get zapped.  This
-    // shouldn't happen, though.
-    _.each(undoData.delTr, function(v) {
-        var prev = v.before;
-        if (prev) {
-            v.tree.insertAfter($("#" + prev));
-        } else {
-            v.tree.prependTo($("#sn0"));
-        }
-        newTr.push(v.tree.attr("id"));
-    });
-
-    _.each(undoData.newTr, function(v) {
-        var theNode = $("#" + v);
-        var prev = theNode.prev();
-        if (prev.length === 0) {
-            prev = null;
-        }
-        delTr.push({
-            tree: theNode.clone(),
-            before: prev && prev.attr("id")
-        });
-        theNode.remove();
-    });
-
-    return {
-        map: map,
-        newTr: newTr,
-        delTr: delTr
-    };
-}
-
-/**
- * Perform undo.
- */
-function undo() {
-    if (undoStack.length === 0) {
-        displayWarning("No further undo information");
-        return;
-    }
-    var lastUndo = undoStack.pop();
-    redoStack.push(doUndo(lastUndo));
-    startnode = endnode = undefined;
-    updateSelection();
-}
-
-/**
- * Perform redo.
- */
-function redo () {
-    if (redoStack.length === 0) {
-        displayWarning("No further redo information");
-        return;
-    }
-    undoStack.push(doUndo(redoStack.pop()));
-    startnode = endnode = undefined;
-    updateSelection();
-}
+// function registerDeletedRootTree(tree) {
+//     var prev = tree.prev();
+//     if (prev.length === 0) {
+//         prev = null;
+//     }
+//     undoDeletedTrees.push({
+//         tree: tree.clone(),
+//         before: prev && prev.attr("id")
+//     });
+// }
 
 // ===== Misc
 
 /**
  * Toggle display of lemmata.
  */
-function toggleLemmata() {
-    if (lemmataHidden) {
-        lemmataStyleNode.innerHTML = "";
-    } else {
-        lemmataStyleNode.innerHTML = ".lemma { display: none; }";
-    }
-    lemmataHidden = !lemmataHidden;
-}
-
-function fixError() {
-    if (!startnode || endnode) return;
-    var sn = $(startnode);
-    if (hasDashTag(sn, "FLAG")) {
-        toggleExtension("FLAG", ["FLAG"]);
-    }
-    updateSelection();
-}
-
-function zeroDashTags() {
-    if (!startnode || endnode) return;
-    var label = getLabel($(startnode));
-    var idx = parseIndex(label),
-        idxType = parseIndexType(label),
-        lab = parseLabel(label);
-    if (idx == -1) {
-        idx = idxType = "";
-    }
-    touchTree($(startnode));
-    setLabelLL($(startnode), lab.split("-")[0] + idxType + idx);
-}
-
-// TODO: should allow numeric indices; document
-function basesAndDashes(bases, dashes) {
-    function _basesAndDashes(string) {
-        var spl = string.split("-");
-        var b = spl.shift();
-        return (bases.indexOf(b) > -1) &&
-            _.all(spl, function (x) { return (dashes.indexOf(x) > -1); });
-    }
-    return _basesAndDashes;
-}
-
-function addLemma(lemma) {
-    // TODO: This only makes sense for dash-format corpora
-    if (!startnode || endnode) return;
-    if (!isLeafNode($(startnode)) || isEmpty(wnodeString($(startnode)))) return;
-    touchTree($(startnode));
-    var theLemma = $("<span class='lemma'>-" + lemma +
-                     "</span>");
-    $(startnode).children(".wnode").append(theLemma);
-}
-
-function untilSuccess() {
-    for (var i = 0; i < arguments.length; i++) {
-        var fn = arguments[i][0],
-            args = arguments[i].slice(1);
-        var res = fn.apply(null, args);
-        if (res) {
-            return;
-        }
-    }
-}
-
-function leafOrNot(leaf, not) {
-    var fn, args;
-    if (guessLeafNode($(startnode))) {
-        fn = arguments[0][0];
-        args = arguments[0].slice(1);
-    } else {
-        fn = arguments[1][0];
-        args = arguments[1].slice(1);
-    }
-    fn.apply(null, args);
-}
+// function toggleLemmata() {
+//     if (lemmataHidden) {
+//         lemmataStyleNode.innerHTML = "";
+//     } else {
+//         lemmataStyleNode.innerHTML = ".lemma { display: none; }";
+//     }
+//     lemmataHidden = !lemmataHidden;
+// }
 
 // ===== Misc (candidates to move to utils)
 
-// TODO: move to utils?
-function setLeafLabel(node, label) {
-    if (!node.hasClass(".wnode")) {
-        // why do we do this?  We should be less fault-tolerant.
-        node = node.children(".wnode").first();
-    }
-    textNode(node).replaceWith($.trim(label));
-}
-// TODO: need a setLemma function as well
-
-// TODO: only called from one place, with indices: possibly specialize name?
-function appendExtension(node, extension, type) {
-    if (!type) {
-        type="-";
-    }
-    if (shouldIndexLeaf(node) && !isNaN(extension)) {
-        // Adding an index to an empty category, and the EC is not an
-        // empty operator.  The final proviso is needed because of
-        // things like the empty WADJP in comparatives.
-        var oldLabel = textNode(node.children(".wnode").first()).text();
-        setLeafLabel(node, oldLabel + type + extension);
-    } else {
-        setNodeLabel(node, getLabel(node) + type + extension, true);
-    }
-}
-
-function removeIndex(node) {
-    node = $(node);
-    if (getIndex(node) == -1) {
-        return;
-    }
-    var label, setLabelFn;
-    if (shouldIndexLeaf(node)) {
-        label = wnodeString(node);
-        setLabelFn = setLeafLabel;
-    } else {
-        label = getLabel(node);
-        setLabelFn = setNodeLabel;
-    }
-    setLabelFn(node,
-               label.substr(0, Math.max(label.lastIndexOf("-"),
-                                        label.lastIndexOf("="))),
-               true);
-}
-
-// A low-level (LL) version of setLabel.  It is only responsible for changing
-// the label; not doing any kind of matching/changing/other crap.
-function setLabelLL(node, label) {
-    if (node.hasClass("snode")) {
-        if (label[label.length - 1] != " ") {
-            // Some other spots in the code depend on the label ending with a
-            // space...
-            label += " ";
-        }
-    } else if (node.hasClass("wnode")) {
-        // Words cannot have a trailing space, or CS barfs on save.
-        label = $.trim(label);
-    } else {
-        // should never happen
-        return;
-    }
-    var oldLabel = parseLabel(getLabel(node));
-    textNode(node).replaceWith(label);
-    updateCssClass(node, oldLabel);
-}
-
-/**
- * Update the CSS class of a node to reflect its label.
- *
- * @param {jQuery} node
- * @param {String} oldlabel (optional) the former label of this node
- */
-function updateCssClass(node, oldlabel) {
-    if (!node.hasClass("snode")) {
-        return;
-    }
-    if (oldlabel) {
-        // should never be needed, but a bit of defensiveness can't hurt
-        oldlabel = parseLabel($.trim(oldlabel));
-    } else {
-        // oldlabel wasn't supplied -- try to guess
-        oldlabel = node.attr("class").split(" ");
-        oldlabel = _.find(oldlabel, function (s) { return (/[A-Z-]/).match(s); });
-    }
-    node.removeClass(oldlabel);
-    node.addClass(parseLabel(getLabel(node)));
-}
-
 //================================================== Obsolete/other
-
-/**
- * Sets the label of a node
- *
- * Contains none of the heuristics of {@link setLabel}.
- *
- * @param {jQuery} node the target node
- * @param {String} label the new label
- * @param {Boolean} noUndo whether to record this operation for later undo
- */
-function setNodeLabel(node, label, noUndo) {
-    // TODO: fold this and setLabelLL together...
-    setLabelLL(node, label);
-}
-
-// TODO(AWE): I think that updating labels on changing nodes works, but
-// this fn should be interactively called with debugging arg to test this
-// supposition.  When I am confident of the behavior of the code, this fn will
-// be removed.
-function resetLabelClasses(alertOnError) {
-    var nodes = $(".snode").each(
-        function() {
-            var node = $(this);
-            var label = $.trim(getLabel(node));
-            if (alertOnError) {
-                var classes = node.attr("class").split(" ");
-                // This incantation removes a value from an array.
-                classes.indexOf("snode") >= 0 &&
-                    classes.splice(classes.indexOf("snode"), 1);
-                classes.indexOf(label) >= 0 &&
-                    classes.splice(classes.indexOf(label), 1);
-                if (classes.length > 0) {
-                    alert("Spurious classes '" + classes.join() +
-                          "' detected on node id'" + node.attr("id") + "'");
-                }
-            }
-        node.attr("class", "snode " + label);
-        });
-}
-
-
-// TODO: badly need a DSL for forms
-
-// Local Variables:
-// js2-additional-externs: ("$" "setTimeout" "customCommands\
-// " "customConLeafBefore" "customConMenuGroups" "extensions" "leaf_extensions\
-// " "clause_extensions" "JSON" "testValidLeafLabel" "testValidPhraseLabel\
-// " "_" "startTime" "console" "loadContextMenu" "safeGet\
-// " "jsonToTree" "objectToTree" "dictionaryToForm" "formToDictionary\
-// " "displayWarning" "displayInfo" "displayError" "isEmpty" "isPossibleTarget\
-// " "isRootNode" "isLeafNode" "guessLeafNode" "getTokenRoot" "wnodeString\
-// " "currentText" "getLabel" "textNode" "getMetadata" "hasDashTag\
-// " "parseIndex" "parseLabel" "parseIndexType" "getIndex" "getIndexType\
-// " "shouldIndexLeaf" "maxIndex" "addToIndices" "changeJustLabel\
-// " "toggleStringExtension" "lookupNextLabel" "commentTypes\
-// " "invisibleCategories" "invisibleRootCategories" "ipnodes" "messageHistory\
-// " "scrollToNext" "clearTimeout" "logDetail" "hasLemma" "getLemma\
-// " "logDetail" "isEmptyNode" "escapeHtml")
-// indent-tabs-mode: nil
-// End:

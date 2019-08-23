@@ -37,244 +37,14 @@ import re
 import subprocess
 import sys
 import tempfile
-from pprint import pprint
-from xml.etree import ElementTree as ET
 
 # External libraries
-import nltk.tree
-
-ARTICLE = {"gr"}
-CASES = {"nf", "þf", "þgf", "ef"}
-GENDERS = {"kk", "kvk", "hk"}
-NUMBERS = {"et", "ft"}
-PERSONS = {"p1", "p2", "p3"}
-TENSE = {"þt", "nt"}
-DEGREE = {"mst", "esb", "evb"}  # fst
-VOICE = {"mm", "gm"}
-MOOD = {"fh", "lh", "lh", "vh", "bh"}
-MISC = {"sagnb", "subj", "abbrev", "op", "none"}
-
-
-HTML_LPAREN = "&#40;"
-HTML_RPAREN = "&#41;"
-
-
-def escaped_parens_to_html_parens(text):
-    return text.replace(r"\(", HTML_LPAREN).replace("\)", HTML_RPAREN)
-
-
-def html_parens_to_escaped_parens(text):
-    return text.replace(HTML_LPAREN, r"\(").replace(HTML_RPAREN, "\)")
-
-
-def html_parens_to_parens(text):
-    return text.replace(HTML_LPAREN, "(").replace(HTML_RPAREN, ")")
-
-
-def escape_parens(text):
-    return text.replace("(", r"\(").replace(")", r"\)")
+# from annotald.annotree import AnnoTree
+from annotald import annotree
 
 
 class AnnotaldException(Exception):
     pass
-
-
-class AnnoTree(nltk.tree.Tree):
-    def __init__(self, *args, **kwargs):
-        super(AnnoTree, self).__init__(*args, **kwargs)
-
-    @classmethod
-    def fromstring(cls, tree_str):
-        transliterated = escaped_parens_to_html_parens(tree_str)
-        return super(AnnoTree, cls).fromstring(transliterated)
-
-    @classmethod
-    def is_terminal(cls, tree):
-        return isinstance(tree, AnnoTree) and tree.label().islower()
-
-    @classmethod
-    def leaf_text(cls, tree):
-        token_text = " ".join([child for child in tree if isinstance(child, str)])
-        return token_text
-
-    @classmethod
-    def to_html(cls, tree, version, extra_data=None):
-        top_level_nodes = {child.label(): child for child in tree}
-
-        meta_node = top_level_nodes.pop("META", None)
-
-        real_root = next(iter(top_level_nodes.values()))
-        snode = cls.to_html_inner(real_root)
-
-        if meta_node:
-            meta_children = {child.label(): child for child in meta_node}
-            id_node = ET.Element(
-                "span",
-                attrib={"class": " ".join(["wnode", "tree-id-node"])},
-            )
-            id_str = cls.leaf_text(meta_children["ID-LOCAL"])
-            id_node.text = id_str
-            snode.insert(0, id_node)
-
-            snode.attrib["data-tree_id"] = id_str
-            snode.attrib["data-corpus_id"] = cls.leaf_text(meta_children["ID-CORPUS"])
-            snode.attrib["data-comment"] = cls.leaf_text(meta_children["COMMENT"]) or ""
-            snode.attrib["data-url"] = cls.leaf_text(meta_children["URL"])
-
-        result = ET.tostring(snode, encoding="utf8", method="html").decode("utf8")
-
-        return result
-
-    @classmethod
-    def to_html_inner(cls, tree):
-        if cls.is_terminal(tree):
-            return cls.terminal_to_html(tree)
-
-        nonterminal = tree.label()
-
-        parts = nonterminal.split("-")
-        nonterminal_class = "nonterminal-{0}".format(parts[0]).lower()
-
-        attrib = {
-            "class": " ".join(["snode", nonterminal_class]),
-            "data-nonterminal": nonterminal,
-        }
-
-        snode = ET.Element("div", attrib=attrib)
-        snode.text = nonterminal
-        snode.extend(list(cls.to_html_inner(x) for x in tree))
-
-        return snode
-
-    @classmethod
-    def terminal_to_html(cls, tree):
-        flat_terminal = tree.label()
-        token_text = cls.leaf_text(tree)
-        lemma = None
-        seg = None
-        exp_attrib = None
-        terminal_extra = {
-            child.label(): child for child in tree if isinstance(child, AnnoTree)
-        }
-
-        if "lemma" in terminal_extra:
-            lemma = cls.leaf_text(terminal_extra["lemma"])
-        if "exp_abbrev" in terminal_extra:
-            seg = {
-                "type": "exp_abbrev",
-                "text": cls.leaf_text(terminal_extra["exp_abbrev"]),
-            }
-            exp_attrib = {"data-abbrev": seg["text"]}
-        elif "exp_seg" in terminal_extra:
-            seg = {"type": "exp_seg", "text": cls.leaf_text(terminal_extra["exp_seg"])}
-            exp_attrib = {"data-seg": seg["text"]}
-
-        parts = split_flat_terminal(flat_terminal)
-        terminal_class = "terminal-{0}".format(parts["cat"]).lower()
-
-        lemma = html_parens_to_parens(lemma) if lemma else lemma
-        token_text = html_parens_to_parens(token_text)
-
-        attrib = {("data-" + key): value for (key, value) in parts.items()}
-        attrib.update(
-            {
-                "class": " ".join(["snode", terminal_class]),
-                "data-text": token_text,
-                "data-lemma": lemma if lemma else "",
-                "data-seg": "",
-                "data-abbrev": "",
-                "data-terminal": flat_terminal,
-            }
-        )
-        if exp_attrib is not None:
-            attrib.update(exp_attrib)
-
-        snode = ET.Element("div", attrib=attrib)
-        snode.text = flat_terminal
-
-        wnode = ET.SubElement(snode, "span", attrib={"class": "wnode"})
-        wnode.text = token_text
-
-        if lemma:
-            lemma_node = ET.SubElement(
-                snode, "span", attrib={"class": "wnode lemma-node"}
-            )
-            lemma_node.text = lemma
-
-        if seg:
-            seg_class = (
-                "exp-seg-node" if seg["type"] == "exp_seg" else "exp-abbrev-node"
-            )
-            seg_node = ET.SubElement(
-                snode, "span", attrib={"class": " ".join(["wnode", seg_class])}
-            )
-            seg_node.text = seg["text"]
-
-        return snode
-
-    def pretty(self):
-        ret = html_parens_to_escaped_parens(_formatTree(self))
-        return ret
-
-
-def split_flat_terminal(term_tok):
-    parts = term_tok.split("_")
-    if len(parts) <= 1:
-        pass
-
-    head = parts[0]
-
-    # Extract case control
-    variants_start = 1
-    case_control = ["", ""]
-    if head == "so":
-        first_variant = parts[1]
-        # case control
-        if first_variant in "012":
-            num_control = int(first_variant)
-            variants_start += num_control + 1
-            # so_0_þt_vh_p1           færi
-            # so_1_þf_þt_vh_p1        tæki mat
-            # so_2_þgf_þf_þt_vh_p1    gæfi honum mat
-            for idx in range(num_control):
-                case_control[idx] = ({parts[2 + idx]} & CASES).pop()
-    variants = set(parts[variants_start:])
-    if head == "fs":
-        case = CASES & variants
-        if case:
-            case_control[0] = case.pop()
-    obj1, obj2 = case_control
-
-    article = ARTICLE & variants
-    case = CASES & variants
-    gender = GENDERS & variants
-    number = NUMBERS & variants
-    person = PERSONS & variants
-    tense = TENSE & variants
-    degree = DEGREE & variants
-    voice = VOICE & variants
-    mood = MOOD & variants
-    misc = MISC & variants
-    data = {
-        "article": article,
-        "case": case,
-        "gender": gender,
-        "number": number,
-        "person": person,
-        "tense": tense,
-        "degree": degree,
-        "voice": voice,
-        "mood": mood,
-        "misc": misc,
-        "cat": {head},
-        "obj1": {obj1},
-        "obj2": {obj2},
-    }
-
-    for (k, v) in list(data.items()):
-        data[k] = "_".join(v)
-
-    return data
 
 
 def intersperse(iterable, delimiter):
@@ -293,7 +63,7 @@ def safe_json(dict):
 def queryVersionCookie(treestr, key):
     if treestr == "" or not treestr:
         return None
-    t = AnnoTree.fromstring(treestr)[0]
+    t = annotree.AnnoTree.fromstring(treestr)[0]
     if t.label() != "VERSION":
         return
     return _queryVersionCookieInner(t, key)
@@ -316,7 +86,7 @@ def _queryVersionCookieInner(tree, key):
 def updateVersionCookie(treestr, key, val):
     if treestr == "" or not treestr:
         return None
-    tree = AnnoTree.fromstring(treestr)
+    tree = annotree.AnnoTree.fromstring(treestr)
     tree = tree[0]
     if tree.label() != "VERSION":
         return
@@ -335,7 +105,7 @@ def updateVersionCookie(treestr, key, val):
 
     ret = dictToMetadata(dd)
     ret.set_label("VERSION")
-    return str(AnnoTree("", [ret]))
+    return str(annotree.AnnoTree("", [ret]))
 
 
 def labelFromLabelAndMetadata(label, metadata):
@@ -363,7 +133,7 @@ def orthoFromTree(tree):
 
 
 def nodeListToDict(nodes):
-    return metadataToDict(AnnoTree("FOO", nodes))
+    return metadataToDict(annotree.AnnoTree("FOO", nodes))
 
 
 def metadataToDict(metadata):
@@ -371,7 +141,7 @@ def metadataToDict(metadata):
     # defaultdict
     d = defaultdict(f)
     for datum in metadata:
-        if isinstance(datum[0], AnnoTree):
+        if isinstance(datum[0], annotree.AnnoTree):
             d[datum.label()] = metadataToDict(datum)
         else:
             d[datum.label()] = datum[0]
@@ -384,10 +154,10 @@ def dictToMetadata(d, label=""):
     keys = list(d.keys())
     l = []
     for k in keys:
-        l.append(AnnoTree(k, dictToMetadata(d[k])))
+        l.append(annotree.AnnoTree(k, dictToMetadata(d[k])))
     l.sort()  # Not technically needed, except to make
     # the output predctable for unit tests
-    return AnnoTree(label, l)
+    return annotree.AnnoTree(label, l)
 
 
 # TODO: unify the calling convention of these fns, so we don't need *args
@@ -405,7 +175,7 @@ def deepTreeToHtml(tree, *args):
             if t.label() == "META":
                 # Find this tree's metadata; we will need it later
                 metadata = t
-            elif isinstance(t[0], AnnoTree):
+            elif isinstance(t[0], annotree.AnnoTree):
                 # if this tree has branching daughters, other than META,
                 # then it is not a leaf.
                 isLeaf = False
@@ -446,8 +216,11 @@ def _formatTree(tree, indent=0):
     else:
         s = "(%s " % (str(tree.label()))
         width = len(s)
-        leaves = ("\n" + " " * (indent + width)).join(
-            [_formatTree(x, indent + width) for x in tree]
+        leaves = (
+            ("\n" + " " * (indent + width))
+            .join(
+                [_formatTree(x, indent + width) for x in tree]
+            )
         )
         return "%s%s%s" % (s, leaves, ")")
 
@@ -556,7 +329,7 @@ def _stripLemma(s):
 
 
 def _getText(tree_text, strip_lemmata=False):
-    tree = AnnoTree(tree_text)
+    tree = annotree.AnnoTree(tree_text)
     to_delete = []
     for i, t in enumerate(tree):
         if t.label() in ["ID", "METADATA"]:
@@ -649,7 +422,7 @@ def _shouldIndexLeaf(tree):
         print(tree.pprint())
         print("Whole tree (from root): ")
         r = tree.root
-        if not isinstance(r, AnnoTree):
+        if not isinstance(r, annotree.AnnoTree):
             r = r()
         print(r.pprint())
         raise e

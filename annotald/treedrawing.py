@@ -31,15 +31,14 @@ import runpy
 import sys
 import time
 import traceback
-
-# Part of the standard library as of 2.7
 import argparse
 
 # External libraries
 import cherrypy
 import cherrypy.lib.caching
 from mako.template import Template
-from annotald.util import AnnoTree
+
+from annotald.annotree import AnnoTree
 
 try:
     from icecream import ic
@@ -345,14 +344,14 @@ class Treedraw(object):
         if vc[0:10] == "( (VERSION":
             self.versionCookie = vc
 
-    def readTrees(self, fileName, text=None):
+    def readTrees(self, fname, text=None):
         if text:
             currentText = text
         else:
-            f = codecs.open(fileName, "r", "utf-8")
-            currentText = f.read()
-            if self.options.outFile:
-                currentText = util.scrubText(currentText)
+            with open(fname, "r") as fh:
+                currentText = fh.read()
+                if self.options.outFile:
+                    currentText = util.scrubText(currentText)
 
         trees = currentText.strip().split("\n\n")
         vc = trees[0]
@@ -379,7 +378,7 @@ class Treedraw(object):
         alltrees = alltrees + "</div>"
         return alltrees
 
-    def renderIndex(self, currentTree, currentSettings, test):
+    def renderIndex(self, currentTree, currentSettings, test, annotrees=None):
         indexTemplate = Template(
             filename=pkg_resources.resource_filename(
                 "annotald", "/data/html/index.mako"
@@ -401,7 +400,7 @@ class Treedraw(object):
             ti = "1 out of " + str(len(self.trees))
         else:
             ti = ""
-
+        annotrees = [tree.to_json() for tree in annotrees]
         return indexTemplate.render(
             annotaldVersion=VERSION,
             currentSettings=currentSettings,
@@ -420,6 +419,7 @@ class Treedraw(object):
             validators=validatorNames,
             treeIndexStatement=ti,
             idle="<div style='color:#64C465'>Editing.</div>",  # noqa
+            annotrees=json.dumps(annotrees),
         )
 
     @cherrypy.expose
@@ -445,17 +445,14 @@ class Treedraw(object):
         currentSettings = open(self.options.settings).read()
         currentTrees = self.readTrees(self.thefile)
         self.trees = currentTrees
-        if self.showingPartialFile:
-            self.treeIndexStart = 0
-            self.treeIndexEnd = self.options.numTrees
-            currentHtml = self.treesToHtml(
-                self.trees[self.treeIndexStart : self.treeIndexEnd]
-            )
-        else:
-            currentHtml = self.treesToHtml(currentTrees)
+
+        # currentHtml = self.treesToHtml(currentTrees)
+        currentHtml = self.treesToHtml("")
+
+        annotrees = AnnoTree.read_from_file(self.thefile)
 
         self.doLogEvent({"type": "page-load", "loc": "inner_index"})
-        return self.renderIndex(currentHtml, currentSettings, False)
+        return self.renderIndex(currentHtml, currentSettings, False, annotrees=annotrees)
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

@@ -24,19 +24,6 @@
 // TODO: add to user manual
 var logDetail = true;
 
-/*
- * These two functions should return true if the string argument is a valid
- * label for a branching (-Phrase-) and non-branching (-Leaf-) label, and
- * false otherwise.  The utility function basesAndDashes is provided.  It
- * takes two arguments, a list of base tags and a list of dash tags.  It
- * returns a function suitable for assigning to one of these variables. The
- * recommended way to accomplish this, however, is to use the waxeye parser
- * generator.  Samples and documentation for this method have yet to be
- * written.
- */
-var testValidPhraseLabel = undefined;
-var testValidLeafLabel   = undefined;
-
 function not_implemented_fn () {
     console.log("Not implemented yet");
 };
@@ -46,9 +33,15 @@ const KEYS = {
     TAB: 8,
     TAB: 9,
     RETURN: 13,
-    CONTROL: 17,
+    SHIFT: 16,   // left
+    CONTROL: 17,   // left
+    ALT: 18,   // left
     ESCAPE: 27,
     SPACE: 32,
+    ARROW_LEFT: 37,
+    ARROW_UP: 38,
+    ARROW_RIGHT: 39,
+    ARROW_DOWN: 40,
     0: 49,
     1: 49,
     2: 50,
@@ -107,6 +100,7 @@ const ENUM = {
         "PP",
         "S",
         "S0",
+        "TO",
         "VP",
     ],
     // All sufixes for a given particular nonterminal prefix
@@ -137,6 +131,7 @@ const ENUM = {
             "CP-ADV-TEMP",
             "CP-EXPLAIN",
             "CP-QUE",
+            "CP-QUOTE",
             "CP-REL",
             "CP-THT",
         ],
@@ -450,31 +445,8 @@ const ENUM = {
 // TODO: _op
 // TODO: _subj
 
-/*
- * Get selected elems, convert to rooted trees
- */
-function get_selection () {
-    return get_selection_inner(startnode, endnode);
-}
-
-function get_selection_inner(startnode, endnode) {
-    if (!startnode) {
-        return false;
-    }
-    let start_sel = get_rooted_node_by_elem(startnode);
-    let multi_sel = {
-        start: start_sel,
-        is_multi: false
-    };
-    if (endnode) {
-        multi_sel.end = get_rooted_node_by_elem(endnode);
-        multi_sel.is_multi = true;
-    }
-    return multi_sel;
-}
-
-function cycle_nonterm_prefix (forward, sel) {
-    let node = sel.start.node;
+function cycle_nonterm_prefix(forward, sel) {
+    let node = sel.node;
 
     let old = node.nonterminal;
     let nt_prefix = node.nonterminal.split("-")[0];
@@ -485,11 +457,11 @@ function cycle_nonterm_prefix (forward, sel) {
     );
 
     node.nonterminal = new_item;
-    return old !== new_item ? node : false;
+    return old !== new_item ? sel : false;
 }
 
 function cycle_nonterm_suffix(forward, sel) {
-    let node = sel.start.node;
+    let node = sel.node;
 
     let nt_prefix = node.nonterminal.split("-")[0];
     let old = node.nonterminal;
@@ -504,7 +476,7 @@ function cycle_nonterm_suffix(forward, sel) {
 }
 
 function cycle_nonterm_short_01(forward, sel) {
-    let node = sel.start.node;
+    let node = sel.node;
     console.log(sel);
 
     let nt_prefix = node.nonterminal.split("-")[0];
@@ -521,11 +493,32 @@ function cycle_nonterm_short_01(forward, sel) {
     );
 
     node.nonterminal = new_item;
-    return old !== new_item ? node : false;
+    return old !== new_item ? sel : false;
+}
+
+function cycle_nonterm_short_01(forward, sel) {
+    let node = sel.node;
+    console.log(sel);
+
+    let nt_prefix = node.nonterminal.split("-")[0];
+    let cycle = ENUM.SHORT_01[nt_prefix];
+    if (cycle === undefined || cycle === "") {
+        console.log("Skipping short_01 for", node.nonterminal);
+        return false;
+    }
+    let old = node.nonterminal;
+    let new_item = array_cycle_next_elem(
+        cycle,
+        old,
+        forward
+    );
+
+    node.nonterminal = new_item;
+    return old !== new_item ? sel : false;
 }
 
 function cycle_nonterm_short_02(forward, sel) {
-    let node = sel.start.node;
+    let node = sel.node;
 
     let nt_prefix = node.nonterminal.split("-")[0];
     let cycle = ENUM.SHORT_02[nt_prefix];
@@ -542,7 +535,7 @@ function cycle_nonterm_short_02(forward, sel) {
     );
 
     node.nonterminal = new_item;
-    return old !== new_item ? node : false;
+    return old !== new_item ? sel : false;
 }
 
 /*
@@ -562,8 +555,8 @@ function array_cycle_next_elem(arr, curr_elem, forward, wrap_elem) {
     return wrap_arr[next_idx];
 }
 
-function cycle_terminal_category (forward, sel) {
-    let node = sel.start.node;
+function cycle_terminal_category(forward, sel) {
+    let node = sel.node;
 
     let old = node.cat;
     let new_item = array_cycle_next_elem(
@@ -574,17 +567,17 @@ function cycle_terminal_category (forward, sel) {
 
     node.cat = new_item;
     let next_variants = ENUM.CAT_TO_VAR[node.cat];
-    for (var_name of Object.keys(ENUM.VAR)) {
+    for (let var_name of Object.keys(ENUM.VAR)) {
         node.variants[name] = next_variants.indexOf(var_name) > 0 ? node.variants[name] : "";
     }
     node.terminal = terminal_to_flat_terminal(node);
 
-    return old !== new_item ? node : false;
+    return old !== new_item ? sel : false;
 }
 
 function make_nonterminal_cycle_fn(arr, forward) {
     function new_fn (sel) {
-        let node = sel.start.node;
+        let node = sel.node;
 
         let old = node.nonterminal;
         let new_item = old;
@@ -629,7 +622,7 @@ function terminal_to_flat_terminal(terminal) {
     let tail = [];
     let variant_names = ENUM.CAT_TO_VAR[terminal.cat];
     if (variant_names) {
-        for (name of variant_names) {
+        for (let name of variant_names) {
             if (name === "obj1" || name === "obj2") {
                 // already inserted case control
                 continue;
@@ -638,7 +631,7 @@ function terminal_to_flat_terminal(terminal) {
         }
     }
     tail = tail.join("_");
-    ret = [head];
+    let ret = [head];
     tail ? ret.push(tail) : 0;
     return ret.join("_");
 }
@@ -646,14 +639,15 @@ function terminal_to_flat_terminal(terminal) {
 /*
  * Create a DOM terminal object from a terminal object
  */
-function terminal_obj_to_dom_elem(obj) {
+function terminal_obj_to_dom_elem(obj, path, tree_index) {
+    let class_list = ["snode", "tree-node", "terminal", `terminal-${obj.cat}`];
     let attrs = {
-        class: ["snode", obj.terminal, `terminal-${obj.cat}`].join(" "),
+        class: class_list.join(" "),
         text: obj.terminal
     };
 
     let variant_names = Object.keys(ENUM.VAR);
-    for (name of variant_names) {
+    for (let name of variant_names) {
         attrs["data-" + name] = obj.variants[name];
     }
     attrs["data-cat"] = obj.cat;
@@ -662,6 +656,14 @@ function terminal_obj_to_dom_elem(obj) {
     attrs["data-terminal"] = obj.terminal;
     attrs["data-seg"] = obj.seg || "";
     attrs["data-abbrev"] = obj.abbrev || "";
+
+    if (path) {
+        attrs["data-path"] = path_to_string(path);
+    }
+    if (tree_index !== undefined) {
+        attrs["data-tree_index"] = "" + tree_index;
+    }
+
     let elem = $("<div/>", attrs);
     let text_elem = $("<span/>", {
         class: "wnode",
@@ -680,7 +682,7 @@ function terminal_obj_to_dom_elem(obj) {
 
     // expansion
     if (obj.seg || obj.abbrev) {
-        exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node"
+        let exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node"
         let exp_elem = $("<span/>", {
             class: ["wnode", exp_class].join(" "),
             text: obj.seg || obj.abbrev
@@ -692,37 +694,82 @@ function terminal_obj_to_dom_elem(obj) {
 }
 
 /*
- * Convert tree to dom form of tree
+ * Convert augmented tree to dom form of tree
  */
-function tree_to_dom_elem (obj) {
-    if (!obj.nonterminal && !obj.terminal) {
-        console.log("Unexpected obj in tree_to_dom_elem");
-        return;
-    }
-    if (obj.terminal) {
-        return terminal_obj_to_dom_elem(obj);
-    }
+function aug_tree_to_dom_elem(aug_tree, tree_index, dom_id) {
+    function nonterminal_to_elem(tree, path) {
+        if (tree.terminal) {
+            return terminal_obj_to_dom_elem(tree, path, tree_index);
+        }
+        let cat = tree.nonterminal.split("-")[0].toLowerCase();
+        let nonterminal_cat = `nonterminal-${cat}`;
+        let class_list = ["snode", "tree-node", "nonterminal", nonterminal_cat];
+        if (path.length === 0) {
+            class_list.push("tree-root");
+        }
+        let attrs = {
+            class: class_list.join(" "),
+            text: tree.nonterminal,
+        };
+        attrs["data-nonterminal"] = tree.nonterminal;
+        attrs["data-path"] = path_to_string(path);
+        attrs["data-tree_index"] = "" + tree_index;
+        let elem = $("<div/>", attrs);
 
-    let cat = obj.nonterminal.split("-")[0].toLowerCase();
-    let nonterminal_cat = `nonterminal-${cat}`;
-    let attrs = {
-        class: ["snode", nonterminal_cat].join(" "),
-        text: obj.nonterminal
-    };
-    attrs["data-nonterminal"] = obj.nonterminal;
-    let elem = $("<div/>", attrs);
-
-    if (obj.hasOwnProperty("tree_id")) {
-        let tree_id_elem = $("<span/>", {
-            class: (["wnode", "tree-id-node"]).join(" "),
-            text: obj.tree_id,
+        tree.children.forEach((child, idx) => {
+            let new_path = [... path].concat(idx);
+            $(elem).append(nonterminal_to_elem(child, new_path));
         });
-        $(elem).append(tree_id_elem);
+
+        return $(elem).first().get(0);
     }
-    for (child of obj.children) {
-        $(elem).append(tree_to_dom_elem(child));
+
+    let elem = nonterminal_to_elem(aug_tree.tree, []);
+    elem.id = dom_id;
+
+    let id_elem = $("<span/>", {
+        class: (["wnode", "tree-id-node"]).join(" "),
+        text: aug_tree.meta.tree_id,
+    });
+
+    function truncate_append_dieresis(string, len) {
+        if (string.length <= len) {
+            return string;
+        }
+        let new_string = string.slice(0, len - 3) + "...";
+        return new_string;
     }
-    return $(elem).first().get(0);
+
+    let url_elem = $("<a/>", {
+        class: (["wnode", "sentence-source"]).join(" "),
+        text: truncate_append_dieresis(aug_tree.meta.url, 40),
+        href: aug_tree.meta.url,
+        target: "_blank",
+    });
+
+    let comment = "This is a comment to a tree";
+    let comment_container = $("<div/>", {
+        class: (["snode", "comment"]).join(" "),
+    });
+    let comment_elem = $("<span/>", {
+        class: (["comment"]).join(" "),
+        text: comment,
+    });
+
+    $(id_elem).insertBefore($(elem).children().first());
+    url_elem.insertAfter(id_elem);
+
+    let comment_button = $("<button/>", {
+        class: (["wnode", "button-local-toggle-comment"]).join(" "),
+        text: "Toggle comment",
+    });
+
+
+    comment_container.append(comment_elem);
+    comment_container.insertAfter(url_elem);
+    comment_button.insertAfter(url_elem);
+
+    return elem;
 }
 
 /*
@@ -752,14 +799,20 @@ function get_child_index_of_elem(elem) {
     ).indexOf(elem);
 }
 
-
-function traverse_elem_path(node, path) {
-    let cursor = node;
+function traverse_elem_path(elem, path) {
+    let cursor = elem;
     for (let child_index of path) {
-        let non_id_nodes = [... cursor.children].filter(
-            (child) => !arr_contains(child.classList, "tree-id-node")
+        let relevant_nodes = [... cursor.children].filter(
+            (child) => {
+                let res = arr_contains(child.classList, "tree-node")
+                return res;
+            }
         );
-        cursor = non_id_nodes[child_index];
+        if (child_index > relevant_nodes.length - 1) {
+            console.error("Illegal path");
+            return undefined;
+        }
+        cursor = relevant_nodes[child_index];
     }
     return cursor;
 }
@@ -773,70 +826,66 @@ function traverse_node_path(node, path) {
 }
 
 /*
- * Extract whole tree that contains sel_elem and convert it to a doubly linked plain tree object,
- * return the current selected node
+ * Generate list of paths of to all descendants (including self), in
+ * depth-first left-to-right order.
  */
-function get_rooted_node_by_elem (sel_elem) {
-    if (!sel_elem.dataset.nonterminal && !sel_elem.dataset.terminal) {
-        console.log("Unexpected dom object in selected");
-        return false;
+function in_order_paths(node) {
+    function in_order(node, path) {
+        let path_str = path_to_string(path);
+        let paths = [path_str];
+        if (node.nonterminal) {
+            node.children.forEach((child, idx) => {
+                let new_path = [... path].concat(idx);
+                let desc_paths = in_order(child, new_path);
+                paths = paths.concat(desc_paths);
+            });
+        }
+        if (!node.terminal && !node.nonterminal) {
+            console.error("Invalid node type");
+        }
+        return paths;
     }
-
-    let path_obj = get_path_to_root_elem(sel_elem);
-    let root_node = dom_node_to_tree(path_obj.root);
-    let path = path_obj.path;
-    let sel_node = traverse_node_path(root_node, path);
-    let cloned_root = clone_tree(root_node);
-
-    let rooted_node = {
-        path: path_obj.path,
-        root_elem: path_obj.root,
-        root_node: root_node,
-        node: sel_node,
-        elem: sel_elem,
-        cloned_root: cloned_root,
-    };
-
-    return rooted_node;
+    return in_order(node, []);
 }
 
 /*
-   Extracts dom element (syntax tree) node and converts it to a plain tree object
+ * Find next node in depth-first left-to-right order.
  */
-function dom_node_to_tree (elem) {
-    if (!elem.dataset.nonterminal && !elem.dataset.terminal) {
-        console.log("Unexpected dom object in dom_node_to_tree");
-        return;
+function node_path_next(node, path) {
+    let paths = in_order_paths(node);
+    let path_str = path_to_string(path);
+    let in_order_idx = paths.indexOf(path_str);
+    if (in_order_idx + 1 < paths.length) {
+        let next_path = paths[in_order_idx + 1];
+        return string_to_path(next_path);
     }
+    return "next";
+}
 
-    function dom_nonterminal_elem_to_obj(elem) {
-        let nt = {
-            nonterminal: elem.dataset.nonterminal,
-            children: []
-        };
-        if (elem.dataset.tree_id) {
-            nt.tree_id = elem.dataset.tree_id;
-            nt.corpus_id = elem.dataset.corpus_id;
-            nt.url = elem.dataset.url;
-            nt.comment = elem.dataset.comment;
-        }
-        return nt
+/*
+ * Find previous node in depth-first left-to-right order.
+ */
+function node_path_prev(node, path) {
+    let paths = in_order_paths(node);
+    let path_str = path_to_string(path);
+    let in_order_idx = paths.indexOf(path_str);
+    if (0 < in_order_idx) {
+        let next_path = paths[in_order_idx - 1];
+        return string_to_path(next_path);
     }
+    return "prev";
+}
 
-    if (elem.dataset.terminal) {
-        return dom_terminal_elem_to_obj(elem);
+/*
+ * Find next node in depth-first left-to-right order.
+ */
+function node_path_last(node) {
+    if (node.terminal) {
+        return [];
     }
-
-    let nt_node = dom_nonterminal_elem_to_obj(elem);
-    for (let child_elem of elem.children) {
-        if ([...child_elem.classList].includes("tree-id-node")) {
-            continue;
-        }
-        let child_node = dom_node_to_tree(child_elem)
-        child_node.parent = nt_node;
-        nt_node.children.push(child_node);
-    }
-    return nt_node;
+    let paths = in_order_paths(node);
+    let next_path = paths[paths.length - 1];
+    return string_to_path(next_path);
 }
 
 /*
@@ -845,7 +894,7 @@ function dom_node_to_tree (elem) {
 function dom_terminal_elem_to_obj(dom_node) {
     let variants = {};
     let variant_names = Object.keys(ENUM.VAR);
-    for (name of variant_names) {
+    for (let name of variant_names) {
         variants[name] = dom_node.dataset[name];
     }
     let term_obj = {
@@ -860,8 +909,8 @@ function dom_terminal_elem_to_obj(dom_node) {
     return term_obj;
 }
 
-function delete_subvariant_by_name (var_name, sel) {
-    let node = sel.start.node;
+function delete_subvariant_by_name(var_name, sel) {
+    let node = sel.node;
     if (!node || !node.terminal) {
         return false;
     }
@@ -869,30 +918,30 @@ function delete_subvariant_by_name (var_name, sel) {
     node.variants[var_name] = "";
     node.terminal = terminal_to_flat_terminal(node);
 
-    return node
+    return sel;
 }
 
-function delete_subvariant_by_index (var_idx, sel) {
-    let node = sel.start.node;
+function delete_subvariant_by_index(var_idx, sel) {
+    let node = sel.node;
     if (!node || !node.terminal) {
         return false;
     }
-    if (var_idx < 0 || CATEGORY_TO_VARIANT_NAMES[node.cat].length <= var_idx) {
-        console.log(`Illegal index '${var_idx}' on ${CATEGORY_TO_VARIANT_NAMES[node.cat]}`);
+    if (var_idx < 0 || ENUM.CATEGORY_TO_VARIANT_NAMES[node.cat].length <= var_idx) {
+        console.error(`Illegal index '${var_idx}' on ${ENUM.CATEGORY_TO_VARIANT_NAMES[node.cat]}`);
         return false;
     }
-    let var_name = CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
+    let var_name = ENUM.CATEGORY_TO_VARIANT_NAMES[node.cat][var_idx];
 
     let old = node.variants[var_name];
     let new_item = "";
     node.variants[var_name] = "";
     node.terminal = terminal_to_flat_terminal(node);
 
-    return old !== new_item ? node : false;
+    return old !== new_item ? sel : false;
 }
 
-function cycle_subvariant_by_variant_name (var_names, forward, sel) {
-    let node = sel.start.node;
+function cycle_subvariant_by_variant_name(var_names, forward, sel) {
+    let node = sel.node;
 
     var_names = Array.isArray(var_names) ? var_names : [var_names];
     let var_name = var_names.filter((name) =>
@@ -920,18 +969,23 @@ function cycle_subvariant_by_variant_name (var_names, forward, sel) {
 
     node.terminal = terminal_to_flat_terminal(node);
 
-    return old !== new_item ? node : false;
+    return old !== new_item ? sel : false;
 }
 
 /*
  * Insert phrasal node as parent of selected node/nodes
  */
 function insert_nonterminal(sel) {
-    if (!sel || !sel.start || !sel.start.node || sel.start.node.tree_id || !sel.start.node.parent) {
+    if (!sel.start) {
+        console.error("Invalid selection");
         return false;
     }
+    let tree = sel.aug_tree.tree;
+    // TODO: special case when root is selected
+    let node = sel.node;
+    let path_to_parent = sel.start.slice(0, sel.start.length - 1);
+    let parent = traverse_node_path(tree, path_to_parent);
 
-    let node = sel.start.node;
     let new_parent_name = undefined;
 
     if (node.terminal) {
@@ -954,16 +1008,15 @@ function insert_nonterminal(sel) {
         children: [],
     };
 
-    let child_idx = sel.start.path[sel.start.path.length - 1];
-    let end_child_idx = sel.is_multi ? sel.end.path[sel.end.path.length - 1] : child_idx;
+    let child_idx = sel.start[sel.start.length - 1];
+    let end_child_idx = sel.end ? sel.end[sel.end.length - 1] : child_idx;
     let sel_length = end_child_idx - child_idx + 1;
-    let extracted_children = node.parent.children.splice(child_idx, sel_length, new_node);
-    new_node.children = extracted_children;
+    let children = parent.children.splice(child_idx, sel_length, new_node);
+    new_node.children = children;
 
-    return new_node;
+    return sel;
 }
 
-let wrapped_insert_nonterminal = mk_undoable(insert_nonterminal);
 
 /*
  * Remove phrasal node at path
@@ -1010,193 +1063,6 @@ function prune_nonterminal(sel) {
     }
     parent.children = children;
     return true;
-}
-
-/*
- * Bind current selection to function
- */
-function with_sel(fn) {
-    function new_fn () {
-        let sel = get_selection();
-        let new_args = [sel].concat([...arguments]);
-        return fn.apply(null, new_args);
-    }
-    return new_fn;
-}
-
-/*
- * Multiplex function by selection type
- */
-function multiplexed_with_sel(mplex_map) {
-    function new_fn () {
-        let sel = get_selection();
-        if (sel.is_multi || !sel.start) {
-            return false;
-        }
-        let ret_fn = false;
-        if (sel.start.node.terminal && mplex_map.terminal) {
-            ret_fn = mplex_map.terminal;
-        } else if (sel.start.node.nonterminal && mplex_map.nonterminal) {
-            ret_fn = mplex_map.nonterminal;
-        }
-        if (!ret_fn) {
-            return false;
-        }
-        let new_args = [sel].concat([...arguments]);
-        return ret_fn.apply(null, new_args);
-    }
-    return new_fn;
-}
-
-/*
- * Partially apply UI node selection to function
- */
-function apply_selection (fn) {
-    function new_fn () {
-        let new_args = [startnode].concat([...arguments]);
-        return fn.apply(null, new_args);
-    }
-    return new_fn;
-}
-
-let undo_system = (function () {
-    let undo_stack = [];
-    let redo_stack = [];
-
-    function undo () {
-        // console.log("undoing");
-        if (undo_stack.length <= 0) {
-            // console.log("undo_stack empty")
-            return;
-        }
-
-        // note: singly linked tree pointing at root
-        let tree_before = undo_stack.pop();
-        let elem_before = tree_to_dom_elem(tree_before);
-        let curr_elem = $(`div.snode[data-tree_id='${tree_before.tree_id}']`).first().get(0);
-        elem_before.id = curr_elem.id;
-        elem_before.dataset.tree_id = curr_elem.dataset.tree_id;
-        elem_before.dataset.corpus_id = curr_elem.dataset.corpus_id;
-        elem_before.dataset.url = curr_elem.dataset.url;
-        elem_before.dataset.comment = curr_elem.dataset.comment;
-
-        let curr_tree = clone_tree(get_rooted_node_by_elem(curr_elem).root_node);
-
-        redo_stack.push(curr_tree);
-        $(curr_elem).replaceWith($(elem_before));
-    }
-
-    function redo() {
-        // console.log("redoing")
-        if (redo_stack.length <= 0) {
-            // console.log("redo_stack empty")
-            return;
-        }
-
-        let tree_after = redo_stack.pop();
-        let elem_after = tree_to_dom_elem(tree_after);
-        let curr_elem = $(`div.snode[data-tree_id='${tree_after.tree_id}']`).first().get(0);
-        elem_after.id = curr_elem.id;
-        elem_after.dataset.tree_id = curr_elem.dataset.tree_id;
-        elem_after.dataset.corpus_id = curr_elem.dataset.corpus_id;
-        elem_after.dataset.url = curr_elem.dataset.url;
-        elem_after.dataset.comment = curr_elem.dataset.comment;
-        let curr_tree = clone_tree(get_rooted_node_by_elem(curr_elem).root_node);
-
-        undo_stack.push(curr_tree);
-        $(curr_elem).replaceWith($(elem_after));
-    }
-
-    function record(tree_root) {
-        // console.log("Recorded")
-        if (!tree_root || !(tree_root.terminal || tree_root.nonterminal)) {
-            console.err("Invalid undo item:", tree_root);
-            return;
-        }
-        redo_stack = [];
-        undo_stack.push(tree_root);
-    }
-
-    function record(tree_root) {
-        redo_stack = [];
-        undo_stack.push(tree_root);
-    }
-
-    function clean(tree_root) {
-        redo_stack = [];
-        undo_stack = [];
-    }
-
-    return {
-        undo_stack: undo_stack,
-        redo_stack: redo_stack,
-        undo: undo,
-        redo: redo,
-        record: record,
-        clean: clean,
-    }
-})();
-
-/*
- * Transform changed node in selection object to dom tree and swap undoably in dom
- */
-function undoable_dom_swap(sel) {
-    let root_elem_in = sel.start.root_elem;
-    let root_elem_out = tree_to_dom_elem(sel.start.root_node);
-    root_elem_out.id = root_elem_in.id;
-    root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id;
-    root_elem_out.dataset["corpus_id"] = sel.start.root_node.corpus_id;
-    root_elem_out.dataset["url"] = sel.start.root_node.url;
-    root_elem_out.dataset["comment"] = sel.start.root_node.comment;
-    undo_system.record(sel.start.cloned_root);
-    // use legacy undo system defined in treedrawing.js
-    undoBeginTransaction();
-    $(touchTree($(root_elem_in)));
-    $(root_elem_in).replaceWith($(root_elem_out));
-    undoEndTransaction();
-}
-
-/*
- * Lift a function that mutates abstract tree objects to undoable dom operations
- */
-function mk_undoable (effectful_fn) {
-    function new_fn (sel) {
-        let DEBUG = 0;
-        let new_args = [].concat([...arguments]);
-
-        DEBUG && console.log("new_args", new_args);
-
-        let is_changed = effectful_fn.apply(null, new_args);
-        DEBUG && console.log("is_changed", is_changed);
-
-        if (!is_changed) {
-            // undoAbortTransaction();
-            return false;
-        }
-
-        let root_elem_in = sel.start.root_elem;
-        undo_system.record(sel.start.cloned_root);
-        let root_elem_out = tree_to_dom_elem(sel.start.root_node);
-        root_elem_out.id = root_elem_in.id;
-        root_elem_out.dataset["tree_id"] = sel.start.root_node.tree_id;
-        root_elem_out.dataset["corpus_id"] = sel.start.root_node.corpus_id;
-        root_elem_out.dataset["url"] = sel.start.root_node.url;
-        root_elem_out.dataset["comment"] = sel.start.root_node.comment;
-
-        // use legacy undo system defined in treedrawing.js
-        undoBeginTransaction();
-        $(touchTree($(root_elem_in)));
-        $(root_elem_in).replaceWith($(root_elem_out));
-        undoEndTransaction();
-
-        let effected_elem = traverse_elem_path(root_elem_out, sel.start.path);
-
-        $(effected_elem).addClass("snodesel");
-        startnode = effected_elem;
-
-        return true;
-    }
-    return new_fn;
 }
 
 let leaf_example_no = {
@@ -1262,10 +1128,487 @@ let root_example = {
     children: [nonterminal_example]
 };
 
-/*
- * Clone (rooted) tree, omitting parent connections
+let aug_tree_example = {
+    tree: root_example,
+    meta: {
+        tree_id: "tree_example.psd,.1",
+        corpus_id: "afb23-31213-1123-1123.7",
+        url: "http://mbl.is/foo/",
+        comment: "tree_example.psd,.1",
+    },
+};
+
+function TreeManager() {
+    this.aug_trees = annotrees;
+    this.id_to_index = {};
+    this.container = $("#sn0");
+    this.undo_stack = [];
+    this.redo_stack = [];
+    this.selection = {
+        index: null,
+        start: null,
+        end: null,
+    };
+    this.prev_selection = null;
+
+    this.init = () => {
+        this.aug_trees.forEach((aug_tree, idx) => {
+            let tree_id = this.aug_trees[idx].meta.tree_id;
+            this.id_to_index[tree_id] = idx;
+        });
+        this.render_all();
+    };
+
+    this.render_all = () => {
+        $(this.container).empty();
+        this.aug_trees.forEach((aug_tree, idx) => {
+            let dom_id = this.index_to_dom_id(idx);
+            let elem = aug_tree_to_dom_elem(aug_tree, idx, dom_id);
+            this.container.append($(elem));
+        });
+        this.selection.index = null;
+        this.selection.start = null;
+        this.selection.end = null;
+    };
+
+    this.render_index = (idx) => {
+        let aug_tree = this.get_tree_by_index(idx);
+        let elem = this.container.children().get(idx);
+        if (!elem) {
+            console.err("Index out of bounds");
+            return;
+        }
+        let tree = aug_tree.tree;
+        tree.tree_id = aug_tree.meta.tree_id;
+        let dom_id = this.index_to_dom_id(idx);
+        let new_elem = aug_tree_to_dom_elem(aug_tree, idx, dom_id);
+        $(elem).replaceWith($(new_elem));
+    };
+
+    this.render_selection = () => {
+        $(".snodesel").removeClass("snodesel");
+        this.get_selected_elements().forEach((el, idx) => {
+            $(el).addClass("snodesel");
+        });
+    };
+
+    this.get_selected_elements = () => {
+        let arr = [];
+        if (!this.selection.start) {
+            return arr;
+        }
+        let dom_id = this.index_to_dom_id(this.selection.index);
+        let runner = this.get_element(dom_id, this.selection.start);
+        arr.push(runner);
+        if (this.selection.end) {
+            let end = this.get_element(dom_id, this.selection.end);
+            while (runner != end) {
+                runner = runner.nextElementSibling;
+                arr.push(runner);
+            }
+        }
+        return arr;
+    };
+
+    this.render_caption = () => {
+        let text = this.get_selected_text();
+        if (text) {
+            $("#urtext").text(text).show();
+        } else {
+            $("#urtext").hide();
+        }
+    };
+
+    this.update_tree = (selection, mod_sel) => {
+        let aug_tree = mod_sel.aug_tree;
+        if (this.get_tree_by_index(this.selection.index) === aug_tree) {
+            // no change
+            return;
+        }
+        this.record(this.selection);
+        this.aug_trees[selection.index] = aug_tree;
+        this.render_index(selection.index);
+
+        this.selection.index = mod_sel.index;
+        this.selection.start = mod_sel.start;
+        this.selection.end = mod_sel.end;
+        this.render_selection();
+
+        this.render_caption();
+    };
+
+    this.select = (dom_id, path) => {
+        let tree_idx = this.dom_id_to_index(dom_id);
+        if (tree_idx !== this.selection.index) {
+            // different tree selected
+            this.selection.start = path;
+            this.selection.index = tree_idx;
+        }
+        else if (!this.selection.start) {
+            // currently no selection
+            this.selection.start = path;
+            this.selection.index = tree_idx;
+        }
+        else if (!this.selection.end) {
+            // currently single selection
+            if (!are_siblings(this.selection.start, path) || _.isEqual(path, this.selection.start)) {
+                // selected somewhere else in tree or the already selected node
+                this.selection.index = null;
+                this.selection.path = null;
+                this.selection.start = null;
+            } else {
+                // selected node is a sibling, different from already selected
+                // fix order of start and end
+                let curr_idx = this.selection.start[path.length - 1];
+                let new_idx = path[path.length - 1];
+                let start = curr_idx < new_idx ? this.selection.start : path;
+                let end = curr_idx < new_idx ? path : this.selection.start;
+                this.selection.start = start;
+                this.selection.end = end;
+            }
+        } else {
+            // currently multi selection
+            if (_.isEqual(path, this.selection.start)) {
+                this.selection.start = this.selection.end;
+                this.selection.end = null;
+            } else if (_.isEqual(path, this.selection.end)) {
+                this.selection.end = null;
+            } else {
+                this.selection.index = null;
+                this.selection.start = null;
+                this.selection.end = null;
+            }
+        }
+
+        this.render_selection();
+        this.render_caption();
+    };
+
+    this.undo = () => {
+        if (this.undo_stack.length === 0) {
+            return;
+        }
+        let saved = this.undo_stack.pop();
+        let tree_id = saved.aug_tree.meta.tree_id;
+        let idx = this.id_to_index[tree_id];
+        let curr_state = {
+            aug_tree: this.get_tree_by_index(idx),
+            selection: clone_obj(this.selection),
+        };
+        this.redo_stack.push(curr_state);
+        this.selection = saved.selection;
+        this.aug_trees[idx] = saved.aug_tree;
+        this.render_index(idx);
+        this.render_selection();
+        this.render_caption();
+        // maybe scroll to selection?
+    };
+
+    this.redo = () => {
+        if (this.redo_stack.length === 0) {
+            return;
+        }
+        let saved = this.redo_stack.pop();
+        let tree_id = saved.aug_tree.meta.tree_id;
+        let idx = this.id_to_index[tree_id];
+        let curr_state = {
+            aug_tree: this.get_tree_by_index(idx),
+            selection: clone_obj(this.selection),
+        };
+        this.undo_stack.push(curr_state);
+        this.selection = saved.selection;
+        this.aug_trees[idx] = saved.aug_tree;
+        this.render_index(idx);
+        this.render_selection();
+        this.render_caption();
+    };
+
+    this.record = (selection) => {
+        this.redo_stack = [];
+        let curr_state = {
+            aug_tree: this.get_tree_by_index(selection.index),
+            selection: this.get_selection(),
+        };
+        this.undo_stack.push(curr_state);
+    };
+
+    this.clear_history = () => {
+        this.undo_stack = [];
+        this.redo_stack = [];
+    };
+
+    this.get_element = (dom_id, path) => {
+        let root_elem = document.getElementById(dom_id);
+        let elem = traverse_elem_path(root_elem, path);
+        return elem;
+    };
+
+    this.get_selected_text = () => {
+        if (!this.selection.start) {
+            return false;
+        }
+        let tree = this.aug_trees[this.selection.index].tree;
+        let text = tree_to_text(tree);
+        return text;
+    };
+
+    this.get_tree_text = (dom_id) => {
+        let idx = this.dom_id_to_index(dom_id);
+        let tree = this.aug_trees[idx].tree;
+        let text = tree_to_text(tree);
+        return text;
+    };
+
+    this.dom_id_to_index = (dom_id) => {
+        return parseInt(dom_id.slice(2)) - 1;
+    };
+
+    this.get_tree_by_tree_id = (tree_id) => {
+        let idx = this.id_to_index[tree_id];
+        return this.get_tree_by_index(idx);
+    };
+
+    this.index_to_dom_id = (idx) => {
+        return `id${idx + 1}`;
+    };
+
+    this.get_tree_by_index = (idx) => {
+        let aug_tree = this.aug_trees[idx];
+        return clone_obj(aug_tree);
+    };
+
+    this.get_tree_by_dom_id = (dom_id) => {
+        let idx = this.dom_id_to_index(dom_id);
+        return this.get_tree_by_index(idx);
+    };
+
+    this.clear_selection = () => {
+        this.selection.index = null;
+        this.selection.start = null;
+        this.selection.end = null;
+        this.render_selection();
+        this.render_caption();
+    };
+
+    this.get_selection = () => {
+        let selection = clone_obj(this.selection);
+        if (selection.index !== null) {
+            selection.aug_tree = this.get_tree_by_index(this.selection.index);
+            selection.node = traverse_node_path(selection.aug_tree.tree, selection.start);
+        } else {
+            selection.aug_tree = null;
+        }
+        return selection;
+    };
+
+    this.get_tree_by_dom_id = (dom_id) => {
+        let idx = this.dom_id_to_index(dom_id);
+        return this.get_tree_by_index(idx);
+    };
+
+    /*
+     * Bind command (fn) such that it will have this.selection as first argument in the state
+     * corresponding to when the function is called
+     */
+    this.wrap_command = (fn) => {
+        let mgr = this;
+        function wrapped_fn() {
+            if (!mgr.has_selection()) {
+                return;
+            }
+            let sel = mgr.get_selection();
+
+            let new_args = [sel].concat([...arguments]);
+            let result = fn.apply(null, new_args);
+
+            if (!result) {
+                return;
+            }
+
+            mgr.update_tree(sel, result);
+        }
+
+        return wrapped_fn;
+    };
+
+    /*
+     * Multiplex command by selection type, otherwise works like wrap_command
+     */
+    this.wrap_multiplex = (fn_map) => {
+        let mgr = this;
+        function wrapped_fn() {
+            if (!mgr.has_selection()) {
+                return false;
+            }
+            let sel = mgr.get_selection();
+
+            if (sel.start && sel.end) {
+                console.error("Invalid selection");
+                return false;
+            } else if (!sel.start) {
+                console.error("Invalid selection");
+                return false;
+            }
+            let fn = undefined;
+            if (sel.node.terminal && fn_map.terminal) {
+                fn = fn_map.terminal;
+            } else if (sel.node.nonterminal && fn_map.nonterminal) {
+                fn = fn_map.nonterminal;
+            } else {
+                console.error("Invalid selection");
+                return false;
+            }
+
+            let new_args = [sel].concat([...arguments]);
+            let result = fn.apply(null, new_args);
+
+            if (!result) {
+                return false;
+            }
+
+            mgr.update_tree(sel, result);
+            return true;
+        }
+
+        return wrapped_fn;
+    };
+    this.has_selection = () => {
+        return this.selection.index !== null;
+    };
+
+    /*
+     * Advance selection such that it now points to the next node in depth-first left-to-right order.
+     * Multiple selection is first converted to singular, null selection does nothing.
+     */
+    this.select_next = () => {
+        if (!this.has_selection()) {
+            return;
+        }
+        let sel = this.get_selection();
+        let tree = sel.aug_tree.tree;
+        let next = node_path_next(tree, sel.start);
+
+        if (next !== "next") {
+            this.selection.start = next;
+            this.render_selection();
+            this.render_caption();
+            this.go_to_selection();
+            return;
+        }
+
+        let tree_idx = sel.index + 1;
+        if (this.aug_trees.length < tree_idx) {
+            // no wrap
+            this.selection.index = null;
+            this.selection.start = null;
+            this.selection.end = null;
+        } else {
+            this.selection.index = tree_idx;
+            this.selection.start = [];
+            this.selection.end = null;
+        }
+
+        this.render_selection();
+        this.render_caption();
+        this.go_to_selection();
+    };
+
+    /*
+     * Advance selection such that it now points to the previous node, cf. select_next
+     */
+    this.select_prev = (forward) => {
+        if (!this.has_selection()) {
+            return;
+        }
+        let sel = this.get_selection();
+        let prev = node_path_prev(sel.aug_tree.tree, sel.start);
+
+        if (prev !== "prev") {
+            this.selection.start = prev;
+            this.render_selection();
+            this.render_caption();
+            this.go_to_selection();
+            return;
+        }
+
+        let tree_idx = sel.index - 1;
+        if (0 <= tree_idx) {
+            let prev_tree = this.get_tree_by_index(tree_idx).tree;
+            this.selection.index = tree_idx;
+            this.selection.start = node_path_last(prev_tree);
+            this.selection.end = null;
+        } else {
+            // no wrap
+            this.selection.index = null;
+            this.selection.start = null;
+            this.selection.end = null;
+        }
+
+        this.render_selection();
+        this.render_caption();
+        this.go_to_selection();
+    };
+
+    this.go_to_selection = () => {
+        if (this.has_selection()) {
+            scrollToShowSel($(".snodesel").first());
+        }
+    }
+}
+
+function common_prefix(path, other) {
+    let max_len = Math.min(path.length, other.length);
+    let common = [];
+    while (common.length < max_len && path[common.length] === other[common.length]) {
+        common.push(path[common.length]);
+    }
+    return common;
+}
+
+function are_siblings(path, other) {
+    if (path.length !== other.length) {
+        return false;
+    }
+    if (path.length === 0) {
+        return true;
+    }
+    common = common_prefix(path, other);
+    return (common.length + 1) === path.length;
+}
+
+function is_descendant(path, other) {
+    let common = common_prefix(path, other);
+    return common.length === other.length;
+}
+
+function selection_contains(sel, path) {
+    if (!sel.start) {
+        // no selection
+        return false;
+    }
+    if (!sel.end) {
+        // singular
+        let common = common_prefix(sel.start, path);
+        return common.length === path.length;
+    }
+
+    let parent = common_prefix(sel.start, sel.end);
+    if (path.length <= parent.length) {
+        return false;
+    }
+    let child_idx = path[parent.length];
+    let start_idx = sel.start[sel.start.length - 1];
+    let end_idx = sel.end[sel.end.length - 1];
+    if (start_idx <= child_idx && child_idx <= end_idx) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Clone object, omitting circular references via parent connections
  */
-function clone_tree(root) {
+function clone_obj(root) {
     let should_skip = ["parent", "children"];
 
     function parentless_view(node) {
@@ -1276,8 +1619,8 @@ function clone_tree(root) {
             }
             obj[prop] = node[prop];
         }
-        obj.children = [];
         if (node.children) {
+            obj.children = [];
             for (let child of node.children) {
                 obj.children.push(parentless_view(child));
             }
@@ -1312,143 +1655,197 @@ function tree_to_text(tree) {
     return _tree_to_text_inner(tree).join(" ");
 }
 
-function populate_context_menu_nonterminal(sel) {
-    let node = sel.start.node;
-    let cat = node.nonterminal.split("-")[0];
-    let names = [... ENUM.NONTERMS];
-    let extensions = ENUM.NONTERM_SUFFIX[cat] || [];
+function ContextMenu(tree_manager) {
 
-    function make_item(suggestion) {
-        let attrs = {
-            class: "conMenuItem",
-            "data-suggestion": suggestion,
-        };
-        let item = $("<div/>", attrs);
-        let text_elem = $("<a/>", {text: suggestion, href:"#"});
-        item.append(text_elem);
-        return item;
-    }
+    this.visible = false;
 
-    function handle_nonterminal_mouse_down(e) {
-        let ev = e || window.event;
-        let sug = ev.srcElement.dataset.suggestion || ev.srcElement.parentElement.dataset.suggestion;
-        sel.start.node.nonterminal = sug;
-        undoable_dom_swap(sel);
-        clearSelection();
-    }
-
-    let conmenu = $("#conMenu").empty();
-    let cat_col = $("<div/>", {class: "conMenuColumn"});
-    let ext_col = $("<div/>", {class: "conMenuColumn"});
-    ext_col.append($("<div/>", {class: "conMenuHeading", text: "Extensions"}));
-    cat_col.append($("<div/>", {class: "conMenuHeading", text: "Categories"}));
-
-    for (suggestion of names) {
-        cat_col.append(make_item(suggestion));
-    }
-    for (suggestion of extensions) {
-        ext_col.append(make_item(suggestion));
-    }
-    cat_col.mousedown(handle_nonterminal_mouse_down);
-    ext_col.mousedown(handle_nonterminal_mouse_down);
-
-    conmenu.append(cat_col);
-    conmenu.append(ext_col);
-}
-
-function populate_context_menu_terminal(sel) {
-    let node = sel.start.node;
-    let name = node.cat;
-    let names = [... ENUM.TERM];
-    let conmenu = $("#conMenu").empty();
-
-    function handle_terminal_mouse_down(e) {
-        let ev = e || window.event;
-        let elem = ev.srcElement.dataset.action_key ? ev.srcElement : ev.srcElement.parentElement;
-
-        let action_key = elem.dataset.action_key;
-        let action_type = elem.dataset.action_type;
-        let action_value = elem.dataset.action_value;
-        let node = sel.start.node;
-
-        if (action_type === "suggestion") {
-            node[action_key] = action_value;
-        } else if (action_type === "add") {
-            node[action_key] = node.text;
-        } else if (action_type === "remove") {
-            node[action_key] = "";
+    this.show = (ev, sel) => {
+        if (sel.node.nonterminal) {
+            this.populate_nonterminal(sel);
+        } else {
+            this.populate_terminal(sel);
         }
-        node.terminal = terminal_to_flat_terminal(node);
 
-        undoable_dom_swap(sel);
-        clearSelection();
-        $(conmenu).off("mousedown", handle_terminal_mouse_down);
-    }
+        var left = ev.pageX;
+        var top = ev.pageY;
+        left = left + "px";
+        top = top + "px";
 
-    let pages = [[]];
-    let row_size = 12;
-    let last_heading = null;
+        var conl = $("#conLeft"),
+            conr = $("#conRight"),
+            conrr = $("#conRightest"),
+            conm = $("#conMenu");
 
-    function add_item(item, heading) {
-        if (pages[pages.length - 1].length >= row_size) {
-            pages.push([{is_heading: true, value: last_heading}]);
+        $("#conMenu .conMenuColumn").each((idx, item) => { $(item).height("auto")});
+        let max_height = _.max($("#conMenu .conMenuColumn"), () => $(window).height());
+        $("#conMenu .conMenuColumn").each((idx, item) => $(item).height(max_height));
+
+        conm.css("left",left);
+        conm.css("top",top);
+        conm.css("visibility","visible");
+        this.visible = true;
+    };
+
+    this.populate_nonterminal = (sel) => {
+        let org_sel = clone_obj(sel);
+        let node = sel.node;
+        let cat = node.nonterminal.split("-")[0];
+        let names = [... ENUM.NONTERMS];
+        let extensions = ENUM.NONTERM_SUFFIX[cat] || [];
+        let conmenu = $("#conMenu").empty();
+        let context_mgr = this;
+
+        function make_item(suggestion) {
+            let attrs = {
+                class: "conMenuItem",
+                "data-suggestion": suggestion,
+            };
+            let item = $("<div/>", attrs);
+            let text_elem = $("<a/>", {text: suggestion, href:"#"});
+            item.append(text_elem);
+            return item;
         }
-        let last_page = pages[pages.length - 1];
-        if (last_heading !== heading) {
-            last_page.push({is_heading: true, value: heading});
-            last_heading = heading;
+
+        function handle_nonterminal_mouse_down(ev) {
+            ev = ev || window.event;
+            let sug = ev.srcElement.dataset.suggestion || ev.srcElement.parentElement.dataset.suggestion;
+            sel.node.nonterminal = sug;
+
+            tree_manager.update_tree(org_sel, sel);
+            context_mgr.hide();
         }
-        last_page.push({is_heading: false, value: item});
-    }
 
-    let has_abbrev = node.abbrev && node.abbrev !== "";
-    let has_seg = node.seg && node.seg !== "";
-    let has_lemma = node.lemma && node.lemma !== "";
-
-    if (!has_lemma) {
-        add_item({action: "add", key: "lemma", value: "Lemma"}, "Add");
-    }
-    if (!has_seg && !has_abbrev) {
-        add_item({action: "add", key: "seg", value: "Segmentation"}, "Add");
-        add_item({action: "add", key: "abbrev", value: "Abbreviation"}, "Add");
-    } else if (has_abbrev) {
-        add_item({action: "remove", key: "abbrev", value: "Abbreviation"}, "Remove");
-    } else if (has_seg) {
-        add_item({action: "remove", key: "seg", value: "Segmentation"}, "Remove");
-    }
-    if (has_lemma) {
-        add_item({action: "remove", key: "lemma", value: "Lemma"}, "Remove");
-    }
-
-
-    for (let suggestion of names) {
-        add_item({action: "suggestion", key: "cat", value: suggestion}, "Categories");
-    }
-
-    for (let page of pages) {
         let cat_col = $("<div/>", {class: "conMenuColumn"});
-        for (let page_item of page) {
-            if (page_item.is_heading) {
-                cat_col.append($("<div/>", {class: "conMenuHeading", text: page_item.value}));
-            } else {
-                let item = page_item.value;
-                let attrs = {class: "conMenuItem"};
-                attrs["data-action_type"] = item.action;
-                attrs["data-action_key"] = item.key;
-                attrs["data-action_value"] = item.value;
-                let item_elem = $("<div/>", attrs);
-                let text_elem = $("<a/>", {text: item.value, href:"#"});
-                item_elem.append(text_elem);
-                cat_col.append(item_elem);
-            }
-        }
-        conmenu.append(cat_col);
-    }
+        let ext_col = $("<div/>", {class: "conMenuColumn"});
+        ext_col.append($("<div/>", {class: "conMenuHeading", text: "Extensions"}));
+        cat_col.append($("<div/>", {class: "conMenuHeading", text: "Categories"}));
 
-    conmenu.mousedown(handle_terminal_mouse_down);
+        for (let suggestion of names) {
+            cat_col.append(make_item(suggestion));
+        }
+        for (let suggestion of extensions) {
+            ext_col.append(make_item(suggestion));
+        }
+        cat_col.mousedown(handle_nonterminal_mouse_down);
+        ext_col.mousedown(handle_nonterminal_mouse_down);
+
+        conmenu.append(cat_col);
+        conmenu.append(ext_col);
+    };
+
+    this.populate_terminal = (sel) => {
+        let org_sel = clone_obj(sel);
+        let node = sel.node;
+        let name = node.cat;
+        let names = [... ENUM.TERM];
+        let conmenu = $("#conMenu").empty();
+        let context_mgr = this;
+
+        function handle_terminal_mouse_down(ev) {
+            ev = ev || window.event;
+            let elem = ev.srcElement.dataset.action_key ? ev.srcElement : ev.srcElement.parentElement;
+
+            let action_key = elem.dataset.action_key;
+            let action_type = elem.dataset.action_type;
+            let action_value = elem.dataset.action_value;
+            let node = sel.node;
+
+            if (action_type === "suggestion") {
+                node[action_key] = action_value;
+            } else if (action_type === "add") {
+                node[action_key] = node.text;
+            } else if (action_type === "remove") {
+                node[action_key] = "";
+            }
+            node.terminal = terminal_to_flat_terminal(node);
+
+            tree_manager.update_tree(org_sel, sel);
+            context_mgr.hide();
+        }
+
+        let pages = [[]];
+        let row_size = 12;
+        let last_heading = null;
+
+        function add_item(item, heading) {
+            if (pages[pages.length - 1].length >= row_size) {
+                pages.push([{is_heading: true, value: last_heading}]);
+            }
+            let last_page = pages[pages.length - 1];
+            if (last_heading !== heading) {
+                last_page.push({is_heading: true, value: heading});
+                last_heading = heading;
+            }
+            last_page.push({is_heading: false, value: item});
+        }
+
+        let has_abbrev = node.abbrev && node.abbrev !== "";
+        let has_seg = node.seg && node.seg !== "";
+        let has_lemma = node.lemma && node.lemma !== "";
+
+        if (!has_lemma) {
+            add_item({action: "add", key: "lemma", value: "Lemma"}, "Add");
+        }
+        if (!has_seg && !has_abbrev) {
+            add_item({action: "add", key: "seg", value: "Segmentation"}, "Add");
+            add_item({action: "add", key: "abbrev", value: "Abbreviation"}, "Add");
+        } else if (has_abbrev) {
+            add_item({action: "remove", key: "abbrev", value: "Abbreviation"}, "Remove");
+        } else if (has_seg) {
+            add_item({action: "remove", key: "seg", value: "Segmentation"}, "Remove");
+        }
+        if (has_lemma) {
+            add_item({action: "remove", key: "lemma", value: "Lemma"}, "Remove");
+        }
+
+
+        for (let suggestion of names) {
+            add_item({action: "suggestion", key: "cat", value: suggestion}, "Categories");
+        }
+
+        for (let page of pages) {
+            let cat_col = $("<div/>", {class: "conMenuColumn"});
+            for (let page_item of page) {
+                if (page_item.is_heading) {
+                    cat_col.append($("<div/>", {class: "conMenuHeading", text: page_item.value}));
+                } else {
+                    let item = page_item.value;
+                    let attrs = {class: "conMenuItem"};
+                    attrs["data-action_type"] = item.action;
+                    attrs["data-action_key"] = item.key;
+                    attrs["data-action_value"] = item.value;
+                    let item_elem = $("<div/>", attrs);
+                    let text_elem = $("<a/>", {text: item.value, href:"#"});
+                    item_elem.append(text_elem);
+                    cat_col.append(item_elem);
+                }
+            }
+            conmenu.append(cat_col);
+        }
+
+        conmenu.mousedown(handle_terminal_mouse_down);
+    };
+
+    this.hide = () => {
+        let conmenu = $("#conMenu").empty();
+        $(conmenu).css("visibility","hidden");
+        $(conmenu).off("mousedown");
+        this.visible = false;
+    };
 }
 
-/*
+function path_to_string(path) {
+    return path.join("-");
+}
+
+function string_to_path(path_str) {
+    if (path_str === "") {
+        return [];
+    }
+    return path_str.split("-").map(x => parseInt(x));
+}
+
+/**
  * Remove backpointer to parent nodes in tree
  */
 function doubly_linked_tree_to_singly_linked(tree) {
@@ -1457,11 +1854,11 @@ function doubly_linked_tree_to_singly_linked(tree) {
     return tree;
 }
 
-/*
+/**
  * Remove empty or undefined attributes in all nodes in tree
  */
 function remove_undefined_or_empty_attr(tree) {
-    let properties = []
+    let properties = [];
     for (let property in tree) {
         if (tree.hasOwnProperty(property)) {
             properties.push(property);
@@ -1479,118 +1876,104 @@ function remove_undefined_or_empty_attr(tree) {
     return tree;
 }
 
-function get_all_trees() {
-    let trees = [];
-    for (child of document.getElementById("sn0").children) {
-        trees.push(dom_node_to_tree(child));
-    }
-    return trees.map(doubly_linked_tree_to_singly_linked).map(remove_undefined_or_empty_attr);
-}
-
 // Keybindings
-function customCommands() {
-    addCommand({ keycode: KEYS.Q}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, FORWARD)),
+function customCommands(mgr) {
+    addCommand({ keycode: KEYS.Q}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "obj1", FORWARD),
+        nonterminal: cycle_nonterm_suffix.bind(null, FORWARD),
     }));
-    addCommand({ keycode: KEYS.Q, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterm_suffix.bind(null, BACKWARD)),
+    addCommand({ keycode: KEYS.Q, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "obj1", BACKWARD),
+        nonterminal: cycle_nonterm_suffix.bind(null, BACKWARD),
     }));
-    addCommand({ keycode: KEYS.W}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", FORWARD)),
+    addCommand({ keycode: KEYS.W}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "obj2", FORWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.W, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "obj2", BACKWARD)),
+    addCommand({ keycode: KEYS.W, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "obj2", BACKWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.E}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], FORWARD)),
+    addCommand({ keycode: KEYS.E}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], FORWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.E, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], BACKWARD)),
+    addCommand({ keycode: KEYS.E, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, ["person", "degree"], BACKWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.R}, multiplexed_with_sel({
+    addCommand({ keycode: KEYS.R}, mgr.wrap_multiplex({
         // TODO: sagnbot/lh_þt/lh_nt
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "mood", FORWARD)),
+        terminal: cycle_subvariant_by_variant_name.bind(null, "mood", FORWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.R, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "mood", BACKWARD)),
+    addCommand({ keycode: KEYS.R, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "mood", BACKWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.T}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD)),
+    addCommand({ keycode: KEYS.T}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "voice", FORWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.T, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "voice", BACKWARD)),
+    addCommand({ keycode: KEYS.T, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "voice", BACKWARD),
         nonterminal: not_implemented_fn,
     }));
 
-    // addCommand({ keycode: KEYS.A}, multiplexed_with_sel({
-    //     // TODO: bin_cycle
-    //     terminal: not_implemented_fn,
-    //     nonterminal: not_implemented_fn,
-    // }));
-
-    addCommand({ keycode: KEYS.A}, multiplexed_with_sel({
-        // TODO: bin_cycle
+    // TODO: bin_cycle
+    addCommand({ keycode: KEYS.A}, mgr.wrap_multiplex({
         terminal: not_implemented_fn,
         nonterminal: not_implemented_fn,
     }));
-
-    addCommand({ keycode: KEYS.S}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", FORWARD)),
+    addCommand({ keycode: KEYS.S}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "number", FORWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.S, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "number", BACKWARD)),
+    addCommand({ keycode: KEYS.S, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "number", BACKWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.D}, multiplexed_with_sel({
+    addCommand({ keycode: KEYS.D}, mgr.wrap_multiplex({
         // TODO: subj_case
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterm_short_02.bind(null, FORWARD)),
+        terminal: cycle_subvariant_by_variant_name.bind(null, "case", FORWARD),
+        nonterminal: cycle_nonterm_short_02.bind(null, FORWARD),
     }));
-    addCommand({ keycode: KEYS.D, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "case", BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterm_short_02.bind(null, BACKWARD)),
+    addCommand({ keycode: KEYS.D, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "case", BACKWARD),
+        nonterminal: cycle_nonterm_short_02.bind(null, BACKWARD),
     }));
-    addCommand({ keycode: KEYS.F}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], FORWARD)),
-        nonterminal: mk_undoable(cycle_nonterm_short_01.bind(null, FORWARD)),
+    addCommand({ keycode: KEYS.F}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], FORWARD),
+        nonterminal: cycle_nonterm_short_01.bind(null, FORWARD),
     }));
-    addCommand({ keycode: KEYS.F, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], BACKWARD)),
-        nonterminal: mk_undoable(cycle_nonterm_short_01.bind(null, BACKWARD)),
+    addCommand({ keycode: KEYS.F, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, ["tense", "gender"], BACKWARD),
+        nonterminal: cycle_nonterm_short_01.bind(null, BACKWARD),
     }));
 
-    addCommand({ keycode: KEYS.C}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "article", FORWARD)),
+    addCommand({ keycode: KEYS.C}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "article", FORWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.C, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "article", BACKWARD)),
+    addCommand({ keycode: KEYS.C, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "article", BACKWARD),
         nonterminal: not_implemented_fn,
     }));
-    addCommand({ keycode: KEYS.V}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", FORWARD)),
-        nonterminal: mk_undoable(prune_nonterminal),
+    addCommand({ keycode: KEYS.V}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "strength", FORWARD),
+        nonterminal: prune_nonterminal,
     }));
-    addCommand({ keycode: KEYS.V, shift: true}, multiplexed_with_sel({
-        terminal: mk_undoable(cycle_subvariant_by_variant_name.bind(null, "strength", BACKWARD)),
-        nonterminal: mk_undoable(prune_nonterminal),
+    addCommand({ keycode: KEYS.V, shift: true}, mgr.wrap_multiplex({
+        terminal: cycle_subvariant_by_variant_name.bind(null, "strength", BACKWARD),
+        nonterminal: prune_nonterminal,
     }));
 
-    addCommand({ keycode: KEYS.X}, with_sel(mk_undoable(insert_nonterminal)));
+    addCommand({ keycode: KEYS.X}, mgr.wrap_command(insert_nonterminal));
 
-    addCommand({ keycode: KEYS.Z , ctrl: true}, undo_system.undo);
-    addCommand({ keycode: KEYS.Z, shift: true}, undo_system.redo);
-    addCommand({ keycode: KEYS.SPACE }, clearSelection);
+    addCommand({ keycode: KEYS.Z , ctrl: true}, mgr.undo);
+    addCommand({ keycode: KEYS.Z, shift: true}, mgr.redo);
+    addCommand({ keycode: KEYS.SPACE }, mgr.clear_selection);
 
-    addCommand({ keycode: KEYS.SOLIDUS }, search);
+    addCommand({ keycode: KEYS.ARROW_UP }, mgr.select_prev);
+    addCommand({ keycode: KEYS.ARROW_DOWN }, mgr.select_next);
 }
