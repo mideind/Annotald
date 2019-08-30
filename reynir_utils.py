@@ -31,8 +31,7 @@ from pathlib import Path
 import sys
 from collections import namedtuple
 
-from nltk import Tree
-from annotald.util import AnnoTree
+from annotald.annotree import AnnoTree
 
 try:
     from reynir import Reynir
@@ -45,9 +44,6 @@ except ImportError as e:
         )
     )
     sys.exit(1)
-
-import annotald.util as util
-
 
 _CASE_MAP = {"nf": "N", "þf": "A", "þgf": "D", "ef": "G"}
 _DEGREE_MAP = {"ms": "R", "evb": "S", "esb": "S", "est": "S"}

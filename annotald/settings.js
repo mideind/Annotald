@@ -226,6 +226,7 @@ const ENUM = {
         obj2: ["nf", "þf", "þgf", "ef"],
         supine: ["sagnb"],
         impersonal: ["op"],
+        // TODO: _subj
     },
     // Variants which can an empty subvariant
     VAR_ALLOW_EMPTY_SUBVAR: [
@@ -302,8 +303,39 @@ const ENUM = {
         fs: ["obj1"],
         person: ["case", "gender"],
         raðnr: ["case", "gender"],
-        sérnafn: ["case"],
+        sérnafn: ["number", "case", "gender", "article"],
         lén: ["case"],
+    },
+    SUBVAR_TO_VAR: {
+        kk: "gender",
+        kvk: "gender",
+        hk: "gender",
+        et: "number",
+        ft: "number",
+        nf: "case",
+        þf: "case",
+        þgf: "case",
+        ef: "case",
+        gr: "article",
+        p1: "person",
+        p2: "person",
+        p3: "person",
+        fh: "mood",
+        vh: "mood",
+        nh: "mood",
+        bh: "mood",
+        nt: "tense",
+        þt: "tense",
+        fst: "degree",
+        mst: "degree",
+        est: "degree",
+        vb: "strength",
+        sb: "strength",
+        mm: "voice",
+        gm: "voice",
+        sagn: "supine",
+        op: "impersonal",
+        // TODO: _subj
     },
     // Cycle groups for which keyboard mappings can be assigned to cycle through
     SHORT_01: {
@@ -440,10 +472,7 @@ const ENUM = {
     //         "ADVP-TIMESTAMP-REL",
     //     ],
     // }
-}
-
-// TODO: _op
-// TODO: _subj
+};
 
 function cycle_nonterm_prefix(forward, sel) {
     let node = sel.node;
@@ -599,6 +628,80 @@ function make_nonterminal_cycle_fn(arr, forward) {
     return new_fn
 }
 
+/**
+ * Create legal partial tree terminal object from flat terminal string.
+ */
+function split_flat_terminal(flat_terminal) {
+    let parts = flat_terminal.split("_");
+    if (parts.length <= 0) {
+        return false;
+    }
+
+    let variants = {};
+    if (!ENUM.TERM.includes(parts[0])) {
+        console.error("Invalid grammatical category");
+        return false;
+    }
+    let head = parts.shift();
+
+    let case_control = [];
+    if (head === "so") {
+        let first_variant = parts[0];
+        if (["0", "1", "2"].includes(first_variant)) {
+            parts.shift();
+            let num_control = parseInt(first_variant);
+            for (let idx=0; idx<num_control; idx++) {
+                let item = parts.shift();
+                if (!ENUM.VAR.case.includes(item)) {
+                    console.error("Invalid subvariant: " + item);
+                    return false;
+                }
+                case_control.push(item);
+            }
+        }
+    } else if (head === "fs") {
+        if (!ENUM.VAR.case.includes(parts[0])) {
+            console.error("Invalid case variant: " + parts[0]);
+            return false;
+        }
+        case_control = [parts[0]];
+        parts.shift();
+    }
+
+    for (let item of parts) {
+        if (!ENUM.SUBVAR_TO_VAR[item]) {
+            console.error("Invalid subvariant: " + item);
+            return false;
+        }
+    }
+
+    let legal_vars = ENUM.CAT_TO_VAR[head];
+    if (!legal_vars) {
+        console.log("No variant for terminal");
+        return {
+            cat: head,
+            variants: variants,
+        };
+    }
+
+    parts.forEach((item, idx) => {
+        let var_name = ENUM.SUBVAR_TO_VAR[item];
+        if (legal_vars.includes(var_name)) {
+            variants[var_name] = item;
+        }
+    });
+
+    case_control.forEach((item, idx) => {
+        let key = "obj" + (idx + 1);
+        variants[key] = item;
+    });
+
+    return {
+        cat: head,
+        variants: variants,
+    };
+}
+
 /*
  * Flatten variants of a terminal object into canonical flat terminal form
  */
@@ -643,19 +746,9 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
     let class_list = ["snode", "tree-node", "terminal", `terminal-${obj.cat}`];
     let attrs = {
         class: class_list.join(" "),
-        text: obj.terminal
     };
 
     let variant_names = Object.keys(ENUM.VAR);
-    for (let name of variant_names) {
-        attrs["data-" + name] = obj.variants[name];
-    }
-    attrs["data-cat"] = obj.cat;
-    attrs["data-lemma"] = obj.lemma || "";
-    attrs["data-text"] = obj.text;
-    attrs["data-terminal"] = obj.terminal;
-    attrs["data-seg"] = obj.seg || "";
-    attrs["data-abbrev"] = obj.abbrev || "";
 
     if (path) {
         attrs["data-path"] = path_to_string(path);
@@ -669,12 +762,20 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
         class: "wnode",
         text: obj.text
     });
+
+    let terminal_elem = $("<span/>", {
+        class: "double-click tree-flat-terminal",
+        text: obj.terminal
+    });
+
+    $(elem).append(terminal_elem);
     $(elem).append(text_elem);
 
     // lemma
     if (obj.lemma) {
+        let classes = ["wnode", "double-click", "lemma-node"];
         let lemma_elem = $("<span/>", {
-            class: ["wnode", "lemma-node"].join(" "),
+            class: classes.join(" "),
             text: obj.lemma
         });
         $(elem).append(lemma_elem);
@@ -682,9 +783,10 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
 
     // expansion
     if (obj.seg || obj.abbrev) {
-        let exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node"
+        let exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node";
+        let classes = ["wnode", "double-click", exp_class];
         let exp_elem = $("<span/>", {
-            class: ["wnode", exp_class].join(" "),
+            class: classes.join(" "),
             text: obj.seg || obj.abbrev
         });
         $(elem).append(exp_elem);
@@ -711,7 +813,6 @@ function aug_tree_to_dom_elem(aug_tree, tree_index, dom_id) {
             class: class_list.join(" "),
             text: tree.nonterminal,
         };
-        attrs["data-nonterminal"] = tree.nonterminal;
         attrs["data-path"] = path_to_string(path);
         attrs["data-tree_index"] = "" + tree_index;
         let elem = $("<div/>", attrs);
@@ -747,29 +848,119 @@ function aug_tree_to_dom_elem(aug_tree, tree_index, dom_id) {
         target: "_blank",
     });
 
-    let comment = "This is a comment to a tree";
     let comment_container = $("<div/>", {
-        class: (["snode", "comment"]).join(" "),
+        class: (["snode", "comment-container"]).join(" "),
     });
-    let comment_elem = $("<span/>", {
-        class: (["comment"]).join(" "),
-        text: comment,
+
+    let comment_elem = $("<p/>", {
+        class: (["comment-text"]).join(" "),
     });
+    let is_empty = aug_tree.meta.comment.length === 0;
+    if (!is_empty) {
+        let parts = [... aug_tree.meta.comment];
+        let first = parts.shift();
+        comment_elem.text(first);
+        $(parts).each((idx, item) => {
+            comment_elem.append($("<div/>", {text: item}));
+        });
+    }
+    comment_elem.attr("data-placeholder", "Write a comment...");
 
     $(id_elem).insertBefore($(elem).children().first());
     url_elem.insertAfter(id_elem);
 
-    let comment_button = $("<button/>", {
-        class: (["wnode", "button-local-toggle-comment"]).join(" "),
-        text: "Toggle comment",
-    });
+    let is_comment_visible = tree_manager.comment_visible[tree_index];
+    let attrs = {
+        class: (["wnode", "local-button-comment"]).join(" "),
+        text: "Hide comment",
+    };
+    attrs["data-command"] = "hide";
 
+    if (!is_empty && is_comment_visible) {
+        attrs.text = "Hide comment";
+        attrs["data-command"] = "hide";
+        comment_container.show();
+    } else if (!is_empty) {
+        attrs.text = "Show comment";
+        attrs["data-command"] = "show";
+        comment_container.hide();
+    } else {
+        attrs.text = "Show comment";
+        attrs["data-command"] = "show";
+        comment_container.hide();
+    }
+
+    let comment_button = $("<button/>", attrs);
+
+    function comment_button_handler(ev) {
+        if (comment_button.data("command") === "show") {
+            tree_manager.comment_visible[tree_index] = true;
+            comment_container.show();
+            comment_button.text("Hide comment");
+            comment_button.data("command", "hide");
+        } else if (comment_button.data("command") === "hide") {
+            comment_container.hide();
+            tree_manager.comment_visible[tree_index] = false;
+            comment_button.text("Show comment");
+            comment_button.data("command", "show");
+        }
+        ev.stopPropagation();
+    }
+
+    function activate_comment(ev) {
+        editor.is_active = true;
+        tree_manager.clear_selection();
+        comment_elem.attr("contentEditable", true);
+        editor.deactivate = deactivate_comment;
+        comment_elem.on("focusout", deactivate_comment);
+
+        ev.stopPropagation();
+    }
+
+    function deactivate_comment(ev) {
+        ev.stopPropagation();
+        editor.is_active = false;
+        comment_elem.attr("contentEditable", false);
+        comment_elem.off("focusout");
+        let text = extract_comment_text(comment_elem);
+
+        if (text.length === 0) {
+            comment_button.val("add-comment");
+            comment_button.text("Add comment");
+        } else if (_.isEqual(text, aug_tree.meta.comment)) {
+            return;
+        }
+        let cloned = clone_obj(aug_tree);
+
+        comment_button.val("show-comment");
+        cloned.meta.comment = text;
+
+        tree_manager.update_tree_by_tree(cloned);
+    }
+
+    comment_container.on("mousedown", activate_comment);
+    comment_button.mousedown(comment_button_handler);
 
     comment_container.append(comment_elem);
     comment_container.insertAfter(url_elem);
     comment_button.insertAfter(url_elem);
 
     return elem;
+}
+
+/*
+  Extract text from content-editable <p> tag. Browser seamlessly adds <div> tags for line breaks.
+ */
+function extract_comment_text(elem) {
+    if (!elem.text().trim()) {
+        return [];
+    }
+    let top_text = elem.clone().children().remove().end().text();
+    let parts = [top_text];
+    let rest = elem.children().each((idx, item) => {
+        parts.push($(item).text());
+    });
+    return parts;
 }
 
 /*
@@ -1150,11 +1341,13 @@ function TreeManager() {
         end: null,
     };
     this.prev_selection = null;
+    this.comment_visible = [];
 
     this.init = () => {
         this.aug_trees.forEach((aug_tree, idx) => {
             let tree_id = this.aug_trees[idx].meta.tree_id;
             this.id_to_index[tree_id] = idx;
+            this.comment_visible[idx] = true;
         });
         this.render_all();
     };
@@ -1234,6 +1427,21 @@ function TreeManager() {
         this.selection.end = mod_sel.end;
         this.render_selection();
 
+        this.render_caption();
+    };
+
+    this.update_tree_by_tree = (aug_tree) => {
+        this.clear_selection();
+        let idx = this.id_to_index[aug_tree.meta.tree_id];
+
+        this.selection.index = idx;
+        this.record(this.selection);
+        this.selection.index = null;
+
+        this.aug_trees[idx] = aug_tree;
+        this.render_index(idx);
+
+        this.render_selection();
         this.render_caption();
     };
 
@@ -1394,7 +1602,7 @@ function TreeManager() {
         let selection = clone_obj(this.selection);
         if (selection.index !== null) {
             selection.aug_tree = this.get_tree_by_index(this.selection.index);
-            selection.node = traverse_node_path(selection.aug_tree.tree, selection.start);
+            selection.node = selection.start ? traverse_node_path(selection.aug_tree.tree, selection.start) : null;
         } else {
             selection.aug_tree = null;
         }
@@ -1472,6 +1680,7 @@ function TreeManager() {
 
         return wrapped_fn;
     };
+
     this.has_selection = () => {
         return this.selection.index !== null;
     };
@@ -1553,7 +1762,16 @@ function TreeManager() {
         if (this.has_selection()) {
             scrollToShowSel($(".snodesel").first());
         }
-    }
+    };
+
+    this.get_all_trees = () => {
+        let clones = [];
+        this.aug_trees.forEach((item, idx) => {
+            let cloned = clone_obj(item);
+            clones.push(cloned);
+        });
+        return clones;
+    };
 }
 
 function common_prefix(path, other) {

@@ -65,7 +65,7 @@ any later version.  See the LICENSE file for more information. -->
         <input class="menubutton" type="button" value="Validate" id="butvalidate" /><br />
         <input class="menubutton" type="button" value="Next Error" id="butnexterr" /><br />
         -->
-        <input class="menubutton" type="button" value="Show Comments" id="button-comment" /><br />
+        <input class="menubutton" type="button" value="Hide comments" id="menu-button-comment" data-command="hide" /><br />
       </div>
       <div id="metadataEditor"
 %if not usemetadata:

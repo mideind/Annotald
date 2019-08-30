@@ -90,9 +90,11 @@ const MOUSE = {
     RIGHT_BUTTON: 2,
 }
 
-var endnode = null;
 var tree_manager = null;
 var context_menu = null;
+let editor = {
+    is_active: false,
+};
 var ctrlKeyMap = {};
 var shiftKeyMap = {};
 var regularKeyMap = {};
@@ -145,16 +147,14 @@ function assignEvents(mgr) {
     // load custom commands from user settings file
     customCommands(mgr);
     document.body.onkeydown = handleKeyDown;
-    // $("#sn0").mousedown(handleNodeClick);
-    $("#sn0").mousedown(editpane_click_handler);
-    // $("#sn0").dblclick(handleNodeDoubleClick);
+    $("#sn0").mousedown(single_click_handler);
     $("#sn0").dblclick(handle_double_click);
-    document.body.onmouseup = killTextSelection;
     $("#butsave").mousedown(save);
     $("#butundo").mousedown(mgr.undo);
     $("#butredo").mousedown(mgr.redo);
     $("#butidle").mousedown(idle);
     $("#butexit").unbind("click").click(quitServer);
+    $("#menu-button-comment").unbind("click").click(menu_button_comment_handler);
     // $("#butvalidate").unbind("click").click(validateTrees);
     // $("#butnexterr").unbind("click").click(nextValidationError);
     // $("#butnexttree").unbind("click").click(nextTree);
@@ -190,6 +190,20 @@ function documentReadyHandler() {
 $(document).ready(function () {
     documentReadyHandler();
 });
+
+function menu_button_comment_handler(ev) {
+    if ($(this).data("command") === "show") {
+        $(".comment-container").show();
+        $(this).val("Hide comments");
+        $(this).data("command", "hide");
+        $(".local-button-comment").text("Hide comment").data("command", "hide");
+    } else if ($(this).data("command") === "hide") {
+        $(".comment-container").hide();
+        $(this).val("Show comments");
+        $(this).data("command", "show");
+        $(".local-button-comment").text("Show comment").data("command", "show");
+    }
+}
 
 // ===== User configuration
 
@@ -247,6 +261,10 @@ function addKeyDownHook(fn) {
 }
 
 function handleKeyDown(ev) {
+    if (editor.is_active) {
+        console.log("skipping handleKeyDown because of editor");
+        return true;
+    }
     if ((ev.ctrlKey && ev.shiftKey) || ev.metaKey || ev.altKey) {
         // unsupported modifier combinations
         return true;
@@ -300,6 +318,7 @@ let prev_startnode = null;
 
 /* If last clicked element was a wnode node, this points to it, otherwise null */
 let last_wnode = null;
+let last_dclickable = null;
 let last_sel = null;
 /* Guard against double single clicks, jQuery or the browser does not natively suppress
    the second single click when the dblclick event fires */
@@ -475,7 +494,7 @@ function move_node(sel, tgt_path) {
     return sel;
 }
 
-function editpane_click_handler (ev) {
+function single_click_handler (ev) {
     if (clicks > 0) {
         ev.preventDefault();
         return true;
@@ -485,10 +504,10 @@ function editpane_click_handler (ev) {
 
     ev = ev || window.event;
     let element = (ev.target || ev.srcElement);
-    if ([... element.classList].includes("wnode")) {
-        last_wnode = element;
+    if ([... element.classList].includes("double-click")) {
+        last_dclickable = element;
     } else {
-        last_wnode = null;
+        last_dclickable = null;
     }
 
     let tree_node = $(element).parents().andSelf().filter(".tree-node").last().get(0);
@@ -538,7 +557,7 @@ function handle_double_click(ev) {
     let event = ev || window.event;
     let element = (event.target || event.srcElement);
 
-    if (last_wnode !== element) {
+    if (last_dclickable !== element) {
         return true;
     }
 
@@ -549,31 +568,44 @@ function handle_double_click(ev) {
     // clone is by value, referential integrity is not maintained
     let node = traverse_node_path(sel.aug_tree.tree, sel.start);
 
-    if (!node.lemma || node.lemma === "") {
+    if (!element.classList) {
         console.error("double click handle on unexpected object", sel);
     }
 
     let changed = false;
-    if (element.classList && [... element.classList].includes("lemma-node")) {
+    if ([... element.classList].includes("lemma-node")) {
         let res = window.prompt("Lemma", node.lemma);
         if (res  && res !== "" && res !== node.lemma) {
             node.lemma = res;
             changed = true;
         }
-    } else if (element.classList && [... element.classList].includes("exp-abbrev-node")) {
+    } else if ([... element.classList].includes("exp-abbrev-node")) {
         let res = window.prompt("Expanded abbreviation", node.abbrev);
         if (res  && res !== "" && res !== node.abbrev) {
             node.abbrev = res;
             changed = true;
         }
         console.log("handleNodeDoubleClick: edit abbrev");
-    } else if (element.classList && [... element.classList].includes("exp-seg-node")) {
+    } else if ([... element.classList].includes("exp-seg-node")) {
         let res = window.prompt("Expanded word segmentation", node.seg);
         if (res  && res !== "" && res !== node.seg) {
             node.lemma = res;
             changed = true;
         }
+    } else if ([... element.classList].includes("tree-flat-terminal")) {
+        let res = window.prompt("Terminal", node.terminal);
+        if (res  && res !== "" && res !== node.terminal) {
+            let split = split_flat_terminal(res);
+            if (!split) {
+                return true;
+            }
+            node.terminal = res;
+            node.cat = split.cat;
+            node.variants = split.variants;
+            changed = true;
+        }
     }
+
     if (changed) {
         tree_manager.update_tree(last_sel, sel);
     }
@@ -1860,7 +1892,8 @@ function coIndex() {
 var is_save_in_progress = false;
 
 function save(e) {
-    let trees = get_all_trees();
+    let trees = tree_manager.get_all_trees();
+
     let data = {trees: trees};
     console.log("saved", trees);
     if (!is_save_in_progress) {

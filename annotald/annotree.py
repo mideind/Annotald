@@ -72,7 +72,8 @@ class AnnoTree(nltk.tree.Tree):
     @classmethod
     def fromstring(cls, tree_str):
         transliterated = escaped_parens_to_html_parens(tree_str)
-        return super(AnnoTree, cls).fromstring(transliterated)
+        tree = super(AnnoTree, cls).fromstring(transliterated)
+        return tree
 
     @classmethod
     def is_terminal(cls, tree):
@@ -99,7 +100,7 @@ class AnnoTree(nltk.tree.Tree):
         ret = {}
         ret["tree_id"] = self.leaf_text(meta.get("ID-LOCAL", []))
         ret["corpus_id"] = self.leaf_text(meta.get("ID-CORPUS", []))
-        ret["comment"] = self.leaf_text(meta.get("COMMENT", []))
+        ret["comment"] = [c._print_comment_line() for c in meta.get("COMMENT", [])]
         ret["url"] = self.leaf_text(meta.get("URL", []))
         return ret
 
@@ -289,26 +290,105 @@ class AnnoTree(nltk.tree.Tree):
 
         return snode
 
-    def pretty(self, offset=0):
-        if self.is_terminal(self):
-            return str(self)
-            pass
-        else:
-            pass
-            base = "({label}".format(label=self.label())
-            width = len(base)
-            offset += width
-            string_parts = [base]
-            for child in self:
-                if isinstance(child, AnnoTree):
-                    string_parts.append(child.pretty(offset=offset))
-                elif isinstance(child, str):
-                    string_parts.append(child)
+    def pretty(self, padding=0):
+        """
+        node     = lparen label space children rparen
+
+        children = node nl padding children | node
+        """
+        left = "({0} ".format(self.label())
+        def_child_padding = len(left) + padding
+        extra_child_padding = def_child_padding
+        parts = [left]
+        num = len(self)
+
+        first_is_str = None
+        if 0 < num:
+            first_is_str = isinstance(self[0], str)
+        if first_is_str:
+            # for placing lemma on same line as token text
+            extra_child_padding = def_child_padding + len(self[0]) + 1
+
+        for (idx, child) in enumerate(self):
+            if idx == 1 and first_is_str:
+                parts.append(" ")
+            elif 0 < idx:
+                parts.append(" " * extra_child_padding)
+
+            if isinstance(child, AnnoTree):
+                if self.label() != "COMMENT":
+                    parts.append(child.pretty(padding=def_child_padding))
                 else:
-                    import pdb; pdb.set_trace()
-                    _ = 1 + 1
-            string_parts.append(")\n")
-        return "".join(string_parts)
+                    # flatten comment line
+                    parts.extend(["(", child._print_comment_line(), ")"])
+            else:
+                # str
+                parts.append(child)
+
+            if idx == 0 and first_is_str and 1 < num:
+                # place lemma on same line as token text
+                pass
+            elif idx < (num - 1):
+                parts.append("\n")
+
+        parts.append(")")
+        return "".join(parts)
+
+    def _print_comment_line(self):
+        parts = [self.label()]
+        parts.extend([str(c) for c in self])
+        comment = " ".join(parts)
+        transliterated = html_parens_to_parens(comment)
+        return transliterated
+
+    @classmethod
+    def aug_tree_from_json(cls, aug_dict):
+        def convert_tree(tree_dict):
+            if "nonterminal" in tree_dict:
+                node = AnnoTree(
+                    tree_dict["nonterminal"],
+                    [convert_tree(child) for child in tree_dict["children"]],
+                )
+            elif "terminal" in tree_dict:
+                flat_terminal = tree_dict["terminal"]
+                text = escape_parens(tree_dict["text"])
+                children = [text]
+
+                if "lemma" in tree_dict and tree_dict["lemma"]:
+                    escaped_lemma = escape_parens(tree_dict["lemma"])
+                    children.append(AnnoTree("lemma", [escaped_lemma]))
+                if "seg" in tree_dict and tree_dict["seg"]:
+                    escaped_seg = escape_parens(tree_dict["seg"])
+                    children.append(AnnoTree("exp_seg", [escaped_seg]))
+                elif "abbrev" in tree_dict and tree_dict["abbrev"]:
+                    escaped_abbrev = escape_parens(tree_dict["abbrev"])
+                    children.append(AnnoTree("exp_abbrev", [escaped_abbrev]))
+
+                node = AnnoTree(flat_terminal, children)
+                return node
+            else:
+                raise ValueError("Illegal tree")
+            return node
+
+        meta_dict = aug_dict["meta"]
+        meta_node = AnnoTree(
+            "META",
+            [
+                AnnoTree("ID-CORPUS", [meta_dict["corpus_id"]]),
+                AnnoTree("ID-LOCAL", [meta_dict["tree_id"]]),
+                AnnoTree("URL", [meta_dict.get("url", "")]),
+                AnnoTree(
+                    "COMMENT",
+                    [
+                        AnnoTree.fromstring("(" + escape_parens(c) + ")")
+                        for c in meta_dict.get("comment", [])
+                    ],
+                ),
+            ],
+        )
+        tree_node = convert_tree(aug_dict["tree"])
+        anno_aug = AnnoTree("", [meta_node, tree_node])
+        return anno_aug
 
 
 def split_flat_terminal(term_tok):
