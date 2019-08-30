@@ -44,6 +44,9 @@ body {
     color: black;
     user-select: none;
 }
+div.tree-node {
+    font-weight: bold;
+}
 
 .wnode {
     margin-left: 20px;
@@ -55,6 +58,7 @@ body {
     background-color: white;
     color: black;
     user-select: none;
+    font-weight: normal;
 }
 
 #sn0 {
@@ -361,11 +365,40 @@ body {
     display: block%;
     margin: 0;
     padding: 0.5em;
+    font-weight: normal;
 }
 
 .comment-text:empty:not(:focus)::before {
     content: attr(data-placeholder);
 }
+
+.terminal-cat {
+    /* margin-left: 1em; */
+    padding-left: 0.5em;
+    padding-top: 3px;
+    padding-bottom: 2px;
+    /* font-size: 120%; */
+    font-weight: bold;
+}
+
+.terminal-subvariant {
+    margin-left: 0.5em;
+    padding-top: 3px;
+    padding-bottom: 2px;
+    font-weight: normal;
+}
+
+.terminal-default-subvariant {
+    margin-left: 0.5em;
+    padding-top: 3px;
+    padding-bottom: 2px;
+    font-size: 90%;
+    font-weight: normal;
+    color: #aaa;
+    /* color: #FFF; */
+    font-style: oblique;
+}
+
 
 /* Misc */
 .shown {

@@ -298,8 +298,8 @@ const ENUM = {
         töl: ["number", "case", "gender"],
         to: ["number", "case", "gender"],
         lo: ["number", "case", "gender", "degree", "strength"],
-        so: ["number", "tense", "supine", "mood",
-             "voice", "person", "obj1", "obj2"], // what about _subj ?
+        so: ["obj1", "obj2", "number", "tense", "mood",
+             "voice", "person", "supine"], // what about _subj ?
         fs: ["obj1"],
         person: ["case", "gender"],
         raðnr: ["case", "gender"],
@@ -335,6 +335,23 @@ const ENUM = {
         gm: "voice",
         sagn: "supine",
         op: "impersonal",
+        // TODO: _subj
+    },
+    VAR_REPR: {
+        gender: "Gender",
+        number: "Number",
+        case: "Case",
+        article: "Article",
+        person: "Person",
+        mood: "Mood",
+        tense: "Tense",
+        degree: "Degree",
+        strength: "Strength",
+        voice: "Voice",
+        obj1: "Case control 1",
+        obj2: "Case control 2",
+        supine: "Supine",
+        impersonal: "Impersonal",
         // TODO: _subj
     },
     // Cycle groups for which keyboard mappings can be assigned to cycle through
@@ -642,7 +659,8 @@ function split_flat_terminal(flat_terminal) {
         console.error("Invalid grammatical category");
         return false;
     }
-    let head = parts.shift();
+    let cat = parts.shift();
+    let head = cat;
 
     let case_control = [];
     if (head === "so") {
@@ -765,8 +783,31 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
 
     let terminal_elem = $("<span/>", {
         class: "double-click tree-flat-terminal",
-        text: obj.terminal
     });
+
+    let term_cat = $("<span/>", {
+        class: "terminal-cat",
+        text: obj.cat,
+    });
+    terminal_elem.append(term_cat);
+
+    let legal_vars = ENUM.CAT_TO_VAR[obj.cat];
+    let ordered_vars = [];
+    if (legal_vars) {
+        legal_vars.forEach((item, idx) => {
+            let subvariant = obj.variants[item];
+            let attrs = {
+                class: "terminal-subvariant",
+                text: subvariant,
+            };
+            attrs["data-variant"] = item;
+            if (!subvariant) {
+                attrs.class = "terminal-subvariant terminal-default-subvariant";
+                attrs.text = ENUM.VAR[item][0];
+            }
+            terminal_elem.append($("<span/>", attrs));
+        });
+    }
 
     $(elem).append(terminal_elem);
     $(elem).append(text_elem);
@@ -1068,7 +1109,7 @@ function node_path_prev(node, path) {
 }
 
 /*
- * Find next node in depth-first left-to-right order.
+ * Find last node in depth-first left-to-right order.
  */
 function node_path_last(node) {
     if (node.terminal) {
@@ -1878,7 +1919,11 @@ function ContextMenu(tree_manager) {
     this.visible = false;
 
     this.show = (ev, sel) => {
-        if (sel.node.nonterminal) {
+        let element = (ev.target || ev.srcElement);
+        if ([... element.classList].includes("terminal-subvariant")) {
+            let variant_name = element.dataset.variant;
+            this.populate_variants(sel, variant_name);
+        } else if (sel.node.nonterminal) {
             this.populate_nonterminal(sel);
         } else {
             this.populate_terminal(sel);
@@ -2042,6 +2087,81 @@ function ContextMenu(tree_manager) {
         }
 
         conmenu.mousedown(handle_terminal_mouse_down);
+    };
+
+    this.populate_variants = (sel, variant_name) => {
+        let org_sel = clone_obj(sel);
+        let node = sel.node;
+        let name = node.cat;
+        let conmenu = $("#conMenu").empty();
+        let context_mgr = this;
+
+        function handle_variant_mouse_down(ev) {
+            ev = ev || window.event;
+            let elem = ev.srcElement.dataset.action_key ? ev.srcElement : ev.srcElement.parentElement;
+
+            let action_key = elem.dataset.action_key;
+            let action_type = elem.dataset.action_type;
+            let action_value = elem.dataset.action_value;
+            let node = sel.node;
+
+            if (action_type === "suggestion") {
+                node.variants[action_key] = action_value;
+            } else if (action_type === "remove") {
+                node.variants[action_key] = "";
+            }
+            node.terminal = terminal_to_flat_terminal(node);
+
+            tree_manager.update_tree(org_sel, sel);
+            context_mgr.hide();
+        }
+
+        let pages = [[]];
+        let row_size = 12;
+        let last_heading = null;
+
+        function add_item(item, heading) {
+            if (pages[pages.length - 1].length >= row_size) {
+                pages.push([{is_heading: true, value: last_heading}]);
+            }
+            let last_page = pages[pages.length - 1];
+            if (last_heading !== heading) {
+                last_page.push({is_heading: true, value: heading});
+                last_heading = heading;
+            }
+            last_page.push({is_heading: false, value: item});
+        }
+
+        let subvars = ENUM.VAR[variant_name];
+        let repr = ENUM.VAR_REPR[variant_name];
+        for (let suggestion of subvars) {
+            add_item({action: "suggestion", key: variant_name, value: suggestion}, repr);
+        }
+        if (sel.node.variants[variant_name]) {
+            add_item({action: "remove", key: variant_name, value: "Remove"}, "Remove");
+        }
+
+        for (let page of pages) {
+            let cat_col = $("<div/>", {class: "conMenuColumn"});
+            for (let page_item of page) {
+                if (page_item.is_heading) {
+                    cat_col.append($("<div/>", {class: "conMenuHeading", text: page_item.value}));
+                } else {
+                    let item = page_item.value;
+                    let attrs = {class: "conMenuItem"};
+                    attrs["data-action_type"] = item.action;
+                    attrs["data-action_key"] = item.key;
+                    attrs["data-action_value"] = item.value;
+                    let item_elem = $("<div/>", attrs);
+                    let text_elem = $("<a/>", {text: item.value, href:"#"});
+                    item_elem.append(text_elem);
+                    cat_col.append(item_elem);
+                }
+            }
+            conmenu.append(cat_col);
+        }
+
+        conmenu.mousedown(handle_variant_mouse_down);
     };
 
     this.hide = () => {
