@@ -1918,6 +1918,12 @@ function ContextMenu(tree_manager) {
 
     this.visible = false;
 
+    const outside_click_listener = (ev) => {
+        if (!$(ev.target).closest("#sn0").length && this.visible) {
+            this.hide();
+        }
+    };
+
     this.show = (ev, sel) => {
         let element = (ev.target || ev.srcElement);
         if ([... element.classList].includes("terminal-subvariant")) {
@@ -1947,6 +1953,8 @@ function ContextMenu(tree_manager) {
         conm.css("top",top);
         conm.css("visibility","visible");
         this.visible = true;
+
+        $(document).on("mousedown", outside_click_listener);
     };
 
     this.populate_nonterminal = (sel) => {
@@ -1976,6 +1984,7 @@ function ContextMenu(tree_manager) {
 
             tree_manager.update_tree(org_sel, sel);
             context_mgr.hide();
+            tree_manager.clear_selection();
         }
 
         let cat_col = $("<div/>", {class: "conMenuColumn"});
@@ -2024,6 +2033,7 @@ function ContextMenu(tree_manager) {
 
             tree_manager.update_tree(org_sel, sel);
             context_mgr.hide();
+            tree_manager.clear_selection();
         }
 
         let pages = [[]];
@@ -2114,6 +2124,7 @@ function ContextMenu(tree_manager) {
 
             tree_manager.update_tree(org_sel, sel);
             context_mgr.hide();
+            tree_manager.clear_selection();
         }
 
         let pages = [[]];
@@ -2169,6 +2180,7 @@ function ContextMenu(tree_manager) {
         $(conmenu).css("visibility","hidden");
         $(conmenu).off("mousedown");
         this.visible = false;
+        document.removeEventListener("click", outside_click_listener);
     };
 }
 
@@ -2310,7 +2322,10 @@ function customCommands(mgr) {
 
     addCommand({ keycode: KEYS.Z , ctrl: true}, mgr.undo);
     addCommand({ keycode: KEYS.Z, shift: true}, mgr.redo);
-    addCommand({ keycode: KEYS.SPACE }, mgr.clear_selection);
+    addCommand({ keycode: KEYS.SPACE }, () => {
+        context_menu.hide();
+        mgr.clear_selection();
+    });
 
     addCommand({ keycode: KEYS.ARROW_UP }, mgr.select_prev);
     addCommand({ keycode: KEYS.ARROW_DOWN }, mgr.select_next);

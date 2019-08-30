@@ -512,6 +512,8 @@ function single_click_handler (ev) {
 
     let tree_node = $(element).parents().andSelf().filter(".tree-node").last().get(0);
     if (!tree_node) {
+        tree_manager.clear_selection();
+        context_menu.hide();
         return false;
     }
 
@@ -538,6 +540,7 @@ function single_click_handler (ev) {
             tree_manager.select(tgt_dom_id, tgt_path);
             context_menu.show(ev, curr_sel);
         } else {
+            context_menu.hide();
             tree_manager.wrap_command(move_node)(tgt_path);
             ev.stopPropagation();
         }
