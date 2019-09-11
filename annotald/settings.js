@@ -260,7 +260,7 @@ const ENUM = {
         entity: "NP",
         eo: "ADJP",
         fn: "NP",
-        fs: "PP",
+        fs: "P",
         fyrirtæki: "NP",
         gata: "NP-ADDR",
         gr: "NP",
