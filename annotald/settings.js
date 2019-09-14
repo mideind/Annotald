@@ -1224,8 +1224,8 @@ function insert_nonterminal(sel) {
         new_parent_name = ENUM.DEFAULT_PARENT[node.cat];
         if (!new_parent_name) {
             console.log("No default parent:", node.cat);
+            new_parent_name = "NP";
         }
-        new_parent_name = "NP";
     } else {
         let nt_prefix = node.nonterminal.split("-")[0];
         new_parent_name = ENUM.DEFAULT_PARENT[nt_prefix];
