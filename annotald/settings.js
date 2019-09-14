@@ -1245,6 +1245,7 @@ function insert_nonterminal(sel) {
     let sel_length = end_child_idx - child_idx + 1;
     let children = parent.children.splice(child_idx, sel_length, new_node);
     new_node.children = children;
+    sel.end = null;
 
     return sel;
 }
