@@ -1847,7 +1847,7 @@ function selection_contains(sel, path) {
     if (!sel.end) {
         // singular
         let common = common_prefix(sel.start, path);
-        return common.length === path.length;
+        return common.length === sel.start.length;
     }
 
     let parent = common_prefix(sel.start, sel.end);
