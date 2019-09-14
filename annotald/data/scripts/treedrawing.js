@@ -394,8 +394,6 @@ function move_node(sel, tgt_path) {
         return false;
     }
 
-    let curr_sel = sel;
-
     let tree = sel.aug_tree.tree;
     let tgt_node = traverse_node_path(tree, tgt_path);
     let before_text = tree_to_text(tree);
@@ -423,11 +421,16 @@ function move_node(sel, tgt_path) {
     let num_selected = 1;
     if (sel.start && sel.end) {
         // inserting temporary parent
-        insert_nonterminal(curr_sel);
-        let start_idx = curr_sel.start[curr_sel.start.length - 1];
-        let end_idx = curr_sel.end[curr_sel.end.length - 1];
+        let start_idx = sel.start[sel.start.length - 1];
+        let end_idx = sel.end[sel.end.length - 1];
         num_selected =  end_idx - start_idx + 1;
+        sel = insert_nonterminal(sel);
+        if (prune_path.length === 1 && prune_path[0] < insert_path[0]) {
+            // translate paths to account for merged node
+            insert_path[0] = insert_path[0] - num_selected + 1;
+        }
     }
+
     let prune_right = hugs_right(common_anc, prune_path, true);
     let prune_left = hugs_left(common_anc, prune_path, true);
     let insert_right = insert_path.length > 0 && hugs_right(common_anc, insert_path, true);
@@ -466,15 +469,15 @@ function move_node(sel, tgt_path) {
         // is_right_move must match prune hug
         let is_right_move = prune_path[0] < insert_path[0];
         if (!(is_right_move && prune_right) && !(!is_right_move && prune_left)) {
-            return true;
+            return false;
         }
         let translated_insert_path = [... insert_path];
         if (result.did_prune && is_right_move) {
-            translated_insert_path[0] = translated_insert_path[0] - num_selected;
+            translated_insert_path[0] = translated_insert_path[0] - 1;
         }
         post_insert_path = insert_node(common_anc, translated_insert_path, result.sel_node, is_right_move);
     }
-        if (sel.start && sel.end) {
+    if (num_selected > 1) {
         // pruning temporary parent
         prune_at_path(common_anc, post_insert_path);
     }
