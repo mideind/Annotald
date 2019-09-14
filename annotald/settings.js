@@ -1281,21 +1281,19 @@ function prune_at_path(anc_node, path) {
  * Remove phrasal node at selection, attaching children to parent of removed node
  */
 function prune_nonterminal(sel) {
-    let node = sel.start.node;
-    if (!node.nonterminal || !node.parent) {
+    let node = sel.node;
+    if (!node.nonterminal || sel.start.length === 0) {
         // cannot delete terminals or tree root
         return false;
     }
-    let parent = node.parent;
-    let child_idx = sel.start.path[sel.start.path.length - 1];
+
+    let parent = traverse_node_path(sel.aug_tree.tree, sel.start.slice(0, sel.start.length-1));
+    let child_idx = sel.start[sel.start.length - 1];
     let left_siblings = parent.children.filter((val, idx) => idx < child_idx);
     let right_siblings = parent.children.filter((val, idx) => idx > child_idx);
     let children = left_siblings.concat(node.children).concat(right_siblings);
-    for (let child of children) {
-        child.parent = parent;
-    }
     parent.children = children;
-    return true;
+    return sel;
 }
 
 let leaf_example_no = {
