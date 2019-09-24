@@ -103,7 +103,7 @@ const ENUM = {
         "TO",
         "VP",
     ],
-    // All sufixes for a given particular nonterminal prefix
+    // All suffixes for a given particular nonterminal prefix
     NONTERM_SUFFIX: {
         ADVP: [
             "ADVP",
@@ -216,19 +216,19 @@ const ENUM = {
         number: ["et", "ft"],
         case: ["nf", "þf", "þgf", "ef"],
         article: ["gr"],
-        person: ["p1", "p2", "p3"],  // note: iirc gender and person can be mutually exclusive
+        person: ["p3", "p2", "p1"],  // note: iirc gender and person can be mutually exclusive
         mood: ["fh", "vh", "nh", "bh"],
         tense: ["nt", "þt"],
         degree: ["fst", "mst", "est"],
         strength: ["vb", "sb"],
-        voice: ["mm", "gm"],  // "þm"
+        voice: ["gm", "mm"],  // "þm"
         obj1: ["nf", "þf", "þgf", "ef"],
         obj2: ["nf", "þf", "þgf", "ef"],
         supine: ["sagnb"],
         impersonal: ["op"],
         // TODO: _subj
     },
-    // Variants which can an empty subvariant
+    // Variants which allow an empty subvariant
     VAR_ALLOW_EMPTY_SUBVAR: [
         "article",
         "case",
@@ -289,7 +289,11 @@ const ENUM = {
     // The variants which a particular terminal category can have
     CAT_TO_VAR: {
         ao: ["degree"],
+        eo: ["degree"],
         no: ["number", "case", "gender", "article"],
+        person: ["case", "gender", "number", "article"],
+        entity: ["case", "gender", "number", "article"],
+        sérnafn: ["number", "case", "gender", "article"],
         abfn: ["number", "case", "gender"],
         fn: ["number", "case", "gender"],
         pfn: ["number", "case", "gender", "person"],
@@ -301,9 +305,7 @@ const ENUM = {
         so: ["obj1", "obj2", "number", "tense", "mood",
              "voice", "person", "supine"], // what about _subj ?
         fs: ["obj1"],
-        person: ["case", "gender"],
         raðnr: ["case", "gender"],
-        sérnafn: ["number", "case", "gender", "article"],
         lén: ["case"],
     },
     SUBVAR_TO_VAR: {
@@ -329,10 +331,10 @@ const ENUM = {
         fst: "degree",
         mst: "degree",
         est: "degree",
-        vb: "strength",
         sb: "strength",
-        mm: "voice",
+        vb: "strength",
         gm: "voice",
+        mm: "voice",
         sagn: "supine",
         op: "impersonal",
         // TODO: _subj

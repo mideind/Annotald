@@ -544,13 +544,13 @@ div.nonterminal-ip {
     border-left: 4px solid #115895;
 }
 
-.terminal-fn {
+.terminal-pfn {
     background: #bae3ff;
     border-left: 4px solid #115895;
 }
 
-.terminal-pfn {
-    background: #bae3ff;
+.terminal-fn {
+    background: #90fad0;
     border-left: 4px solid #115895;
 }
 
@@ -590,27 +590,37 @@ div.nonterminal-ip {
 }
 
 .terminal-ártal {
-    background: #FFFFFF;
+    background: #bffa90;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-dags {
-    background: #FFFFFF;
+    background: #bffa90;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-dagsafs {
+    background: #bffa90;
+    border-left: 4px solid #FF0000;
+}
+
+.terminal-dagsfast {
+    background: #bffa90;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-fyrirtæki {
-    background: #FFFFFF;
+    background: #bae3ff;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-gata {
-    background: #FFFFFF;
+    background: #bae3ff;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-gr {
-    background: #FFFFFF;
+    background: #90fad0;
     border-left: 4px solid #FF0000;
 }
 
@@ -625,7 +635,7 @@ div.nonterminal-ip {
 }
 
 .terminal-prósenta {
-    background: #FFFFFF;
+    background: #bae3ff;
     border-left: 4px solid #FF0000;
 }
 
@@ -640,7 +650,7 @@ div.nonterminal-ip {
 }
 
 .terminal-spao {
-    background: #FFFFFF;
+    background: #bffa90;
     border-left: 4px solid #FF0000;
 }
 
@@ -655,21 +665,21 @@ div.nonterminal-ip {
 }
 
 .terminal-tala {
-    background: #FFFFFF;
+    background: #bae3ff;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-tímapunktur {
-    background: #FFFFFF;
+    background: #bffa90;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-tími {
-    background: #FFFFFF;
+    background: #bffa90;
     border-left: 4px solid #FF0000;
 }
 
 .terminal-uh {
-    background: #FFFFFF;
+    background: #bffa90;
     border-left: 4px solid #FF0000;
 }
