@@ -17,7 +17,8 @@ class VARIANT:
     NUMBERS = {"et", "ft"}
     PERSONS = {"p1", "p2", "p3"}
     TENSE = {"þt", "nt"}
-    DEGREE = {"mst", "esb", "evb"}  # fst
+    DEGREE = {"fst", "mst", "est", "esb", "evb"}
+    STRENGTH = {"sb", "vb"}
     VOICE = {"mm", "gm"}
     MOOD = {"fh", "lh", "lh", "vh", "bh"}
     MISC = {"sagnb", "subj", "abbrev", "op", "none"}
@@ -426,6 +427,7 @@ def split_flat_terminal(term_tok):
     person = VARIANT.PERSONS & variants
     tense = VARIANT.TENSE & variants
     degree = VARIANT.DEGREE & variants
+    strength = VARIANT.STRENGTH & variants
     voice = VARIANT.VOICE & variants
     mood = VARIANT.MOOD & variants
     misc = VARIANT.MISC & variants
@@ -437,6 +439,7 @@ def split_flat_terminal(term_tok):
         "person": person,
         "tense": tense,
         "degree": degree,
+        "strength": strength,
         "voice": voice,
         "mood": mood,
         "misc": misc,

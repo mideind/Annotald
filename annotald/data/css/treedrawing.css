@@ -502,11 +502,6 @@ div.nonterminal-ip {
     border-left: 4px solid #b7312d;
 }
 
-.nonterminal-inf {
-    background: #ffa19d;
-    border-left: 4px solid #b7312d;
-}
-
 /* Greynir terminal styling */
 
 .terminal-fs {
@@ -551,20 +546,15 @@ div.nonterminal-ip {
 
 .terminal-fn {
     background: #90fad0;
-    border-left: 4px solid #115895;
+    border-left: 4px solid #4da08c;
 }
 
 .terminal-töl {
-    background: #bae3ff;
-    border-left: 4px solid #115895;
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
 }
 
 .terminal-ao {
-    background: #bffa90;
-    border-left: 4px solid #3a963a;
-}
-
-.terminal-tao {
     background: #bffa90;
     border-left: 4px solid #3a963a;
 }
@@ -591,37 +581,37 @@ div.nonterminal-ip {
 
 .terminal-ártal {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
 
 .terminal-dags {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
 
 .terminal-dagsafs {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
 
 .terminal-dagsfast {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
 
 .terminal-fyrirtæki {
     background: #bae3ff;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #115895;
 }
 
 .terminal-gata {
     background: #bae3ff;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #115895;
 }
 
 .terminal-gr {
     background: #90fad0;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #4da08c;
 }
 
 .terminal-\. {
@@ -636,7 +626,7 @@ div.nonterminal-ip {
 
 .terminal-prósenta {
     background: #bae3ff;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #115895;
 }
 
 .terminal-so {
@@ -647,11 +637,6 @@ div.nonterminal-ip {
 .terminal-nhm {
     background: #ffd1cd;
     border-left: 4px solid #b7312d;
-}
-
-.terminal-spao {
-    background: #bffa90;
-    border-left: 4px solid #FF0000;
 }
 
 .terminal-st {
@@ -665,21 +650,21 @@ div.nonterminal-ip {
 }
 
 .terminal-tala {
-    background: #bae3ff;
-    border-left: 4px solid #FF0000;
+    background: #90fad0;
+    border-left: 4px solid #4da08c;
 }
 
 .terminal-tímapunktur {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
 
 .terminal-tími {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
 
 .terminal-uh {
     background: #bffa90;
-    border-left: 4px solid #FF0000;
+    border-left: 4px solid #3a963a;
 }
