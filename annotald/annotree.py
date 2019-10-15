@@ -110,7 +110,7 @@ class AnnoTree(nltk.tree.Tree):
         if isinstance(obj, io.TextIOBase):
             text = obj.read()
         elif isinstance(obj, str) or isinstance(obj, Path):
-            with open(obj, "r") as handle:
+            with open(obj, "r", encoding="utf-8") as handle:
                 text = handle.read()
         else:
             raise ValueError("Illegal file or path object")
@@ -138,7 +138,7 @@ class AnnoTree(nltk.tree.Tree):
         if isinstance(obj, io.TextIOBase):
             write_to_io(obj)
         elif isinstance(obj, str) or isinstance(obj, Path):
-            with open(obj, "w") as handle:
+            with open(obj, "w", encoding="utf-8") as handle:
                 write_to_io(handle)
         else:
             raise ValueError("Illegal file or path object")
