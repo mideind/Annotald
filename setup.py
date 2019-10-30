@@ -30,7 +30,7 @@ setup(
     package_data={
         "annotald": ["data/*/*", "settings.py", "settings.js"]
     },
-    install_requires=["mako", "cherrypy", "argparse", "nltk"],
+    install_requires=["mako", "cherrypy", "argparse", "nltk", "requests"],
     setup_requires=["setuptools"],
     provides=["annotald"],
     **setup_args

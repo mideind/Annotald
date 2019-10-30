@@ -21,7 +21,9 @@ class VARIANT:
     STRENGTH = {"sb", "vb"}
     VOICE = {"mm", "gm"}
     MOOD = {"fh", "lh", "lh", "vh", "bh"}
-    MISC = {"sagnb", "subj", "abbrev", "op", "none"}
+    SUPINE = {"sagnb"}
+    CLITIC = {"sn"}
+    MISC = {"subj", "abbrev", "op", "none"}
 
 
 def escaped_parens_to_html_parens(text):
@@ -399,12 +401,14 @@ def split_flat_terminal(term_tok):
 
     head = parts[0]
 
-    # Extract case control
+    # Extract valence
     variants_start = 1
     case_control = ["", ""]
+    subj = ""
     if head == "so":
         first_variant = parts[1]
         # case control
+        num_control = 0
         if first_variant in "012":
             num_control = int(first_variant)
             variants_start += num_control + 1
@@ -413,6 +417,19 @@ def split_flat_terminal(term_tok):
             # so_2_þgf_þf_þt_vh_p1    gæfi honum mat
             for idx in range(num_control):
                 case_control[idx] = ({parts[2 + idx]} & VARIANT.CASES).pop()
+        if parts[variants_start] == "subj" and parts[variants_start + 1] == "op":
+            # so_1_nf_subj_op_þgf_þt_vh_p1    mér gafst tækifæri
+            subj = parts[variants_start + 2]
+            variants_start += 3
+        if "lh" in parts and "þt" in parts:
+            parts.pop(parts.index("lh"))
+            parts.pop(parts.index("þt"))
+            parts.append("lhþt")
+            pass
+        elif "lh" in parts and "nt" in parts:
+            parts.pop(parts.index("lh"))
+            parts.pop(parts.index("nt"))
+            parts.append("lhnt")
     variants = set(parts[variants_start:])
     if head == "fs":
         case = VARIANT.CASES & variants
@@ -430,6 +447,8 @@ def split_flat_terminal(term_tok):
     strength = VARIANT.STRENGTH & variants
     voice = VARIANT.VOICE & variants
     mood = VARIANT.MOOD & variants
+    supine = VARIANT.SUPINE & variants
+    clitic = VARIANT.CLITIC & variants
     misc = VARIANT.MISC & variants
     data = {
         "article": article,
@@ -442,10 +461,13 @@ def split_flat_terminal(term_tok):
         "strength": strength,
         "voice": voice,
         "mood": mood,
+        "supine": supine,
+        "clitic": clitic,
         "misc": misc,
         "cat": {head},
         "obj1": {obj1},
         "obj2": {obj2},
+        "subj": {subj},
     }
 
     for (k, v) in list(data.items()):

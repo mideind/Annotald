@@ -219,17 +219,17 @@ const ENUM = {
         number: ["et", "ft"],
         case: ["nf", "þf", "þgf", "ef"],
         article: ["gr"],
-        person: ["p3", "p2", "p1"],  // note: iirc gender and person can be mutually exclusive
-        mood: ["fh", "vh", "nh", "bh"],
+        person: ["p1", "p2", "p3"],
+        mood: ["fh", "vh", "nh", "bh", "lhnt", "lhþt"],
         tense: ["nt", "þt"],
         degree: ["fst", "mst", "est"],
         strength: ["sb", "vb"],
-        voice: ["gm", "mm"],  // "þm"
+        voice: ["gm", "mm"],
         obj1: ["nf", "þf", "þgf", "ef"],
         obj2: ["nf", "þf", "þgf", "ef"],
         supine: ["sagnb"],
-        impersonal: ["op"],
-        // TODO: _subj
+        subj: ["nf", "þf", "þgf", "ef"],
+        clitic: ["sn"],  // enclitic for second person
     },
     // Variants which allow an empty subvariant
     VAR_ALLOW_EMPTY_SUBVAR: [
@@ -242,6 +242,8 @@ const ENUM = {
         "strength",
         "supine",
         "voice",
+        "clitic",
+        "mood",  // sagnb has no mood in 1.9 reynir_package
     ],
     // Default parent of terminal tags and nonterminal prefixes
     DEFAULT_PARENT: {
@@ -304,10 +306,9 @@ const ENUM = {
         tala: ["number", "case", "gender"],
         töl: ["number", "case", "gender"],
         to: ["number", "case", "gender"],
-        lo: ["number", "case", "gender", "degree", "strength", 
-             "impersonal"],
-        so: ["obj1", "obj2", "person", "number", "mood", "tense", 
-             "voice", "supine"], // what about _subj ?
+        lo: ["number", "case", "gender", "degree", "strength"],
+        so: ["obj1", "obj2", "subj", "person", "number",
+             "mood", "tense", "voice", "supine", "clitic"],
         fs: ["obj1"],
         raðnr: ["case", "gender"],
         lén: ["case"],
@@ -330,6 +331,8 @@ const ENUM = {
         vh: "mood",
         nh: "mood",
         bh: "mood",
+        lhþt: "mood",
+        lhnt: "mood",
         nt: "tense",
         þt: "tense",
         fst: "degree",
@@ -339,9 +342,8 @@ const ENUM = {
         vb: "strength",
         gm: "voice",
         mm: "voice",
-        sagn: "supine",
-        op: "impersonal",
-        // TODO: _subj
+        sagnb: "supine",
+        sn: "clitic",
     },
     VAR_REPR: {
         gender: "Gender",
@@ -356,9 +358,9 @@ const ENUM = {
         voice: "Voice",
         obj1: "Case control 1",
         obj2: "Case control 2",
+        subj: "Subject case control",
         supine: "Supine",
-        impersonal: "Impersonal",
-        // TODO: _subj
+        clitic: "2P Clitic",
     },
     // Cycle groups for which keyboard mappings can be assigned to cycle through
     SHORT_01: {
@@ -524,27 +526,6 @@ function cycle_nonterm_suffix(forward, sel) {
     );
 
     node.nonterminal = new_item;
-    return old !== new_item ? node : false;
-}
-
-function cycle_nonterm_short_01(forward, sel) {
-    let node = sel.node;
-    console.log(sel);
-
-    let nt_prefix = node.nonterminal.split("-")[0];
-    let cycle = ENUM.SHORT_01[nt_prefix];
-    if (cycle === undefined || cycle === "") {
-        console.log("Skipping short_01 for", node.nonterminal);
-        return false;
-    }
-    let old = node.nonterminal;
-    let new_item = array_cycle_next_elem(
-        cycle,
-        old,
-        forward
-    );
-
-    node.nonterminal = new_item;
     return old !== new_item ? sel : false;
 }
 
@@ -651,6 +632,21 @@ function make_nonterminal_cycle_fn(arr, forward) {
     return new_fn
 }
 
+function prompt_edit_lemma(sel) {
+    let node = sel.node;
+    if (!node.terminal) {
+        return false;
+    }
+    let changed = false;
+    let lemma_text = node.lemma ? node.lemma : "";
+    let res = window.prompt("Lemma", lemma_text);
+    if (res  && res !== "" && res !== lemma_text) {
+        node.lemma = res;
+        changed = true;
+    }
+    return changed ? sel : false;
+}
+
 /**
  * Create legal partial tree terminal object from flat terminal string.
  */
@@ -682,6 +678,20 @@ function split_flat_terminal(flat_terminal) {
                 }
                 case_control.push(item);
             }
+        } else {
+            console.error("Illegal flat terminal, missing argument number");
+            return false;
+        }
+        // parse subject case control
+        if (parts[0] === "subj" || parts[0] === "op") {
+            parts.shift();
+            parts[0] === "op" ? parts.shift() : null ;
+            subj_case = parts.shift();
+            if (!ENUM.VAR.case.includes(item)) {
+                console.error("Invalid subvariant: " + item);
+                return false;
+            }
+
         }
     } else if (head === "fs") {
         if (!ENUM.VAR.case.includes(parts[0])) {
@@ -739,6 +749,11 @@ function terminal_to_flat_terminal(terminal) {
         head = [terminal.cat, String(governs.length)];
         let governs_str = governs.join("_");
         governs_str ? head.push(governs_str) : 0;
+        if (terminal.variants.subj) {
+            head.push("subj");
+            head.push("op");
+            head.push(terminal.variants.subj);
+        }
         head = head.join("_");
     } else if (terminal.cat === "fs") {
         let suffix = variants.obj1 ? ("_" + variants.obj1) : "";
@@ -748,10 +763,11 @@ function terminal_to_flat_terminal(terminal) {
     }
     let tail = [];
     let variant_names = ENUM.CAT_TO_VAR[terminal.cat];
+    let skip_list = ["obj1", "obj2", "subj"]
     if (variant_names) {
         for (let name of variant_names) {
-            if (name === "obj1" || name === "obj2") {
-                // already inserted case control
+            if (skip_list.includes(name)) {
+                //handle them separately
                 continue;
             }
             variants[name] ? tail.push(variants[name]) : 0;
@@ -763,6 +779,33 @@ function terminal_to_flat_terminal(terminal) {
     return ret.join("_");
 }
 
+function so_terminal_to_legal_variants(flat_terminal) {
+    let parts = flat_terminal.split("_");
+    let legal_variants = [];
+    let expect_trans = false;  // object case control
+    if (parts.includes("lhþt") || (parts.includes("lh") && parts.includes("þt"))) {
+        // number, case, gender, strength, supine
+        // supine should imply et, hk
+        legal_variants = ["mood", "number", "case", "gender", "strength"];
+        expect_trans = false;
+    } else if (parts.includes("fh") || parts.includes("vh")) {
+        legal_variants = ["obj1", "obj2", "mood", "subj", "person", "number", "tense", "voice", "clitic"];
+        expect_trans = true;
+    } else if (parts.includes("bh")) {
+        legal_variants = ["obj1", "obj2", "mood", "subj", "number", "voice", "clitic"];
+        expect_trans = true;
+    } else if (parts.includes("nh")) {
+        legal_variants = ["mood", "voice"];
+        expect_trans = false;
+    } else if (parts.includes("lhnt") || (parts.includes("lh") && parts.includes("nt"))) {
+        legal_variants = ["mood"];
+        expect_trans = false;
+    } else {
+        legal_variants = ["mood", "supine", "voice"];
+    }
+    return legal_variants
+}
+
 /*
  * Create a DOM terminal object from a terminal object
  */
@@ -771,8 +814,6 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
     let attrs = {
         class: class_list.join(" "),
     };
-
-    let variant_names = Object.keys(ENUM.VAR);
 
     if (path) {
         attrs["data-path"] = path_to_string(path);
@@ -798,6 +839,9 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
     terminal_elem.append(term_cat);
 
     let legal_vars = ENUM.CAT_TO_VAR[obj.cat];
+    if (obj.cat === "so") {
+        legal_vars = so_terminal_to_legal_variants(obj.terminal);
+    }
     let ordered_vars = [];
     if (legal_vars) {
         legal_vars.forEach((item, idx) => {
@@ -829,6 +873,8 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
     }
 
     // expansion
+    // exp-abbrev: a.m.k. becomes að minnsta kosti
+    //    exp-seg: guðfræðinemi becomes guðfræði-nemi
     if (obj.seg || obj.abbrev) {
         let exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node";
         let classes = ["wnode", "double-click", exp_class];
@@ -992,6 +1038,36 @@ function aug_tree_to_dom_elem(aug_tree, tree_index, dom_id) {
     comment_container.insertAfter(url_elem);
     comment_button.insertAfter(url_elem);
 
+
+    function reparse(ev) {
+        let curr_text = tree_to_text(aug_tree.tree);
+        ev.stopPropagation();
+        let text = tree_manager.get_tree_text(dom_id);
+        request_parse(text, function on_success(tree) {
+            let new_text = tree_to_text(tree);
+            if (curr_text !== new_text) {
+                displayError("Could not parse text");
+                console.log(curr_text);
+                console.log(new_text);
+                return;
+            }
+            let cloned = clone_obj(aug_tree);
+            cloned.tree = tree;
+            tree_manager.update_tree_by_tree(cloned);
+            displayInfo("Parse successful")
+        }, function on_error() {
+        });
+    }
+
+    let reparse_button = $("<button/>", {
+        class: (["wnode", "local-button-reparse"]).join(" "),
+        text: "Reparse",
+    });
+    reparse_button.on("mousedown", reparse);
+    reparse_button.insertAfter(comment_button);
+
+
+
     return elem;
 }
 
@@ -1097,7 +1173,8 @@ function node_path_next(node, path) {
         let next_path = paths[in_order_idx + 1];
         return string_to_path(next_path);
     }
-    return "next";
+    // There is no next node in current tree
+    return "next_tree";
 }
 
 /*
@@ -1111,7 +1188,8 @@ function node_path_prev(node, path) {
         let next_path = paths[in_order_idx - 1];
         return string_to_path(next_path);
     }
-    return "prev";
+    // There is no previous node in current tree;
+    return "prev_tree";
 }
 
 /*
@@ -1544,6 +1622,9 @@ function TreeManager() {
         }
         let saved = this.undo_stack.pop();
         let tree_id = saved.aug_tree.meta.tree_id;
+        if (!tree_id) {
+            console.error("Invalid tree_id");
+        }
         let idx = this.id_to_index[tree_id];
         let curr_state = {
             aug_tree: this.get_tree_by_index(idx),
@@ -1555,7 +1636,6 @@ function TreeManager() {
         this.render_index(idx);
         this.render_selection();
         this.render_caption();
-        // maybe scroll to selection?
     };
 
     this.redo = () => {
@@ -1564,6 +1644,9 @@ function TreeManager() {
         }
         let saved = this.redo_stack.pop();
         let tree_id = saved.aug_tree.meta.tree_id;
+        if (!tree_id) {
+            console.error("Invalid tree_id");
+        }
         let idx = this.id_to_index[tree_id];
         let curr_state = {
             aug_tree: this.get_tree_by_index(idx),
@@ -1740,10 +1823,11 @@ function TreeManager() {
             return;
         }
         let sel = this.get_selection();
+        this.selection.end = null;
         let tree = sel.aug_tree.tree;
         let next = node_path_next(tree, sel.start);
 
-        if (next !== "next") {
+        if (next !== "next_tree") {
             this.selection.start = next;
             this.render_selection();
             this.render_caption();
@@ -1776,9 +1860,10 @@ function TreeManager() {
             return;
         }
         let sel = this.get_selection();
+        this.selection.end = null;
         let prev = node_path_prev(sel.aug_tree.tree, sel.start);
 
-        if (prev !== "prev") {
+        if (prev !== "prev_tree") {
             this.selection.start = prev;
             this.render_selection();
             this.render_caption();
@@ -1802,6 +1887,60 @@ function TreeManager() {
         this.render_selection();
         this.render_caption();
         this.go_to_selection();
+    };
+
+    /*
+     * Expand current selection towards the right, only succeeds if current selection has
+     * an unselected immediate right-sibling
+     */
+    this.expand_selection_to_right = () => {
+        if (!this.has_selection()) {
+            return;
+        }
+        let sel = this.get_selection();
+        let tree = sel.aug_tree.tree;
+
+        let rightmost = sel.end || sel.start;
+        let path_next = [... rightmost];
+        let depth = path_next.length - 1;
+        path_next[depth] = path_next[depth] + 1;
+        let next_node = traverse_node_path(tree, path_next);
+        if (!next_node) {
+            return;
+        }
+
+        sel.end = path_next;
+        this.selection = sel;
+        this.render_selection();
+    };
+
+    /*
+     * Contract current selection towards the left (from rightmost element),
+     * only succeeds if current selection has is longer than a single node
+     */
+    this.contract_selection_from_right = () => {
+        if (!this.has_selection()) {
+            return;
+        }
+        let sel = this.get_selection();
+        if (!sel.end) {
+            return;
+        }
+        let tree = sel.aug_tree.tree;
+
+        let rightmost = sel.end || sel.start;
+        let path_prev = [... rightmost];
+        let prev_child_idx = rightmost[rightmost.length - 1] - 1;
+        path_prev[path_prev.length - 1] = prev_child_idx;
+        let start_child_idx = sel.start[sel.start.length - 1];
+
+        if (prev_child_idx < 0) {
+            return;
+        }
+        sel.end = start_child_idx === prev_child_idx ? null : path_prev;
+        this.selection = sel;
+        this.render_selection();
+
     };
 
     this.go_to_selection = () => {
@@ -2332,6 +2471,17 @@ function customCommands(mgr) {
         mgr.clear_selection();
     });
 
+    addCommand({ keycode: KEYS.L}, mgr.wrap_multiplex({
+        terminal: prompt_edit_lemma,
+        nonterminal: not_implemented_fn,
+    }));
+    addCommand({ keycode: KEYS.M}, mgr.wrap_multiplex({
+        terminal: prompt_edit_lemma,
+        nonterminal: not_implemented_fn,
+    }));
+
     addCommand({ keycode: KEYS.ARROW_UP }, mgr.select_prev);
     addCommand({ keycode: KEYS.ARROW_DOWN }, mgr.select_next);
+    addCommand({ keycode: KEYS.ARROW_UP, shift: true}, mgr.contract_selection_from_right);
+    addCommand({ keycode: KEYS.ARROW_DOWN, shift: true}, mgr.expand_selection_to_right);
 }

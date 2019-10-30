@@ -1728,6 +1728,45 @@ function toggleCollapsed() {
 
 // ===== Tree manipulations
 
+let pending_parse_request = false;
+function request_parse(text, success_cb) {
+    let payload = {text: text};
+    console.log("Requesting parse: '" + text + "'");
+    if (!pending_parse_request) {
+        displayWarning("Requesting parse...");
+        pending_parse_request = true;
+        setTimeout(function () {
+            $.ajax({
+                type: "POST",
+                contentType : "application/json",
+                dataType: "json",
+                url: "/parse_single",
+                async: true,
+                traditional: true,
+                data: JSON.stringify(payload),
+                success: function (resp) {
+                    if (resp.aug_tree) {
+                        console.log(resp)
+                        let tree = resp.aug_tree.tree;
+                        success_cb(tree);
+                    } else {
+                        displayError("Could not parse text");
+                        console.error(resp);
+                    }
+
+                },
+                error: function (args) {
+                    displayError("Error during parsing");
+                    console.error(args);
+                },
+                complete: function (args) {
+                    pending_parse_request = false;
+                }
+            });
+        }, 0);
+    }
+}
+
 // ========== Movement
 
 // ========== Creation

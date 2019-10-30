@@ -47,6 +47,7 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 from annotald import util
+from annotald import reynir_utils
 
 VERSION = annotald.__version__
 
@@ -404,6 +405,22 @@ class Treedraw(object):
                 treeIndexEnd=self.treeIndexEnd,
                 totalTrees=len(self.trees),
             )
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    @cherrypy.tools.json_out()
+    def parse_single(self, data=None):
+        data = data or cherrypy.request.json
+        text = data["text"]
+        annotree = reynir_utils.parse_single(text)
+        if annotree is None:
+            annotree = reynir_utils.request_parse_single(text)
+            if annotree is None:
+                return dict(result="failure", reason="server got an exception")
+        return dict(
+            result="success",
+            aug_tree=annotree.to_json(),
+        )
 
 
 def _main(argv):
