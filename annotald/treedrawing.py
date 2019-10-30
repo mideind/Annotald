@@ -194,7 +194,7 @@ class Treedraw(object):
             return {"result": "success"}
         evtTime = time.time()
         eventData["filename"] = self.options.psd[0]
-        with open("annotaldLog.txt", "a") as f:
+        with open("annotaldLog.txt", "a", encoding="utf-8") as f:
             f.write(str(evtTime) + ": " + json.dumps(eventData) + "\n")
         return dict(result="success")
 
@@ -225,7 +225,7 @@ class Treedraw(object):
 
     @cherrypy.expose
     def test(self):
-        currentSettings = open(self.options.settings).read()
+        currentSettings = open(self.options.settings, encoding="utf-8").read()
         currentTree = self.readTrees(
             None,
             text="""
@@ -261,7 +261,7 @@ class Treedraw(object):
         if text:
             currentText = text
         else:
-            with open(fname, "r") as fh:
+            with open(fname, "r", encoding="utf-8") as fh:
                 currentText = fh.read()
                 if self.options.outFile:
                     currentText = util.scrubText(currentText)
@@ -355,7 +355,7 @@ class Treedraw(object):
     @cherrypy.expose(alias=getpass.getuser())
     def inner_index(self):
         cherrypy.lib.caching.expires(0, force=True)
-        currentSettings = open(self.options.settings).read()
+        currentSettings = open(self.options.settings, encoding="utf-8").read()
         currentTrees = self.readTrees(self.thefile)
         self.trees = currentTrees
 
