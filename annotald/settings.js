@@ -219,7 +219,7 @@ const ENUM = {
         number: ["et", "ft"],
         case: ["nf", "þf", "þgf", "ef"],
         article: ["gr"],
-        person: ["p1", "p2", "p3"],
+        person: ["p3", "p2", "p1"],
         mood: ["fh", "vh", "nh", "bh", "lhnt", "lhþt"],
         tense: ["nt", "þt"],
         degree: ["fst", "mst", "est"],
