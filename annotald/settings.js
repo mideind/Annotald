@@ -801,7 +801,7 @@ function so_terminal_to_legal_variants(flat_terminal) {
         legal_variants = ["mood"];
         expect_trans = false;
     } else {
-        legal_variants = ["mood", "supine", "voice"];
+        legal_variants = ["obj1", "obj2", "mood", "voice", "supine"];
     }
     return legal_variants
 }
