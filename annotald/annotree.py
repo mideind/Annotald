@@ -20,10 +20,10 @@ class VARIANT:
     DEGREE = {"fst", "mst", "est", "esb", "evb"}
     STRENGTH = {"sb", "vb"}
     VOICE = {"mm", "gm"}
-    MOOD = {"fh", "lh", "lh", "vh", "bh"}
+    MOOD = {"fh", "vh", "nh", "bh", "lhnt", "lhþt"}
     SUPINE = {"sagnb"}
     CLITIC = {"sn"}
-    MISC = {"subj", "abbrev", "op", "none"}
+    IMPERSONAL = {"none", "es", "subj"}
 
 
 def escaped_parens_to_html_parens(text):
@@ -42,7 +42,7 @@ def escape_parens(text):
     return text.replace("(", "\\(").replace(")", "\\)")
 
 
-def tree_offsets(text):
+def tree_spans_from_text(text):
     lparen, rparen = "(", ")"
 
     def iter_parens(text):
@@ -122,7 +122,7 @@ class AnnoTree(nltk.tree.Tree):
     @classmethod
     def fromstring_many(cls, text):
         trees = []
-        for (start, end) in tree_offsets(text):
+        for (start, end) in tree_spans_from_text(text):
             tree_str = text[start:end]
             tree = cls.fromstring(tree_str)
             trees.append(tree)
@@ -399,28 +399,48 @@ def split_flat_terminal(term_tok):
     if len(parts) <= 1:
         pass
 
-    head = parts[0]
+    cat = parts[0]
 
     # Extract valence
     variants_start = 1
-    case_control = ["", ""]
-    subj = ""
-    if head == "so":
+    data = dict(cat=cat)
+    if cat == "so":
         first_variant = parts[1]
-        # case control
         num_control = 0
         if first_variant in "012":
             num_control = int(first_variant)
-            variants_start += num_control + 1
+            variants_start += 1
             # so_0_þt_vh_p1           færi
             # so_1_þf_þt_vh_p1        tæki mat
             # so_2_þgf_þf_þt_vh_p1    gæfi honum mat
             for idx in range(num_control):
-                case_control[idx] = ({parts[2 + idx]} & VARIANT.CASES).pop()
-        if parts[variants_start] == "subj" and parts[variants_start + 1] == "op":
-            # so_1_nf_subj_op_þgf_þt_vh_p1    mér gafst tækifæri
-            subj = parts[variants_start + 2]
-            variants_start += 3
+                var = parts[2 + idx]
+                if var in VARIANT.CASES:
+                    variants_start += 1
+                    data["obj" + str(idx + 1)] = var
+
+        if "subj" in parts:
+            # so_1_þgf_op_subj_nf_þt_fh_p1_mm | mér gafst ekki tækifæri
+            parts.pop(parts.index("subj"))
+            data["impersonal"] = "subj"
+            subj = [var for var in parts[variants_start:] if var in VARIANT.CASES]
+            if subj:
+                subj = subj.pop()
+                data["subj"] = subj
+                parts.pop(parts.index(subj))
+            if "op" in parts:
+                parts.pop(parts.index("op"))
+        elif "op" in parts and "es" in parts:
+            # so_0_op_es_nt_fh_p3 | það rignir
+            data["impersonal"] = "es"
+            parts.pop(parts.index("op"))
+            parts.pop(parts.index("es"))
+            pass
+        elif "op" in parts:
+            data["impersonal"] = "none"
+            parts.pop(parts.index("op"))
+            pass
+
         if "lh" in parts and "þt" in parts:
             parts.pop(parts.index("lh"))
             parts.pop(parts.index("þt"))
@@ -430,47 +450,34 @@ def split_flat_terminal(term_tok):
             parts.pop(parts.index("lh"))
             parts.pop(parts.index("nt"))
             parts.append("lhnt")
+
+    elif cat == "fs":
+        if len(parts) > 1 and parts[0] in VARIANT.CASES:
+            data["obj1"] = parts[0]
+            variants_start += 1
+
     variants = set(parts[variants_start:])
-    if head == "fs":
-        case = VARIANT.CASES & variants
-        if case:
-            case_control[0] = case.pop()
-    obj1, obj2 = case_control
 
-    article = VARIANT.ARTICLE & variants
-    case = VARIANT.CASES & variants
-    gender = VARIANT.GENDERS & variants
-    number = VARIANT.NUMBERS & variants
-    person = VARIANT.PERSONS & variants
-    tense = VARIANT.TENSE & variants
-    degree = VARIANT.DEGREE & variants
-    strength = VARIANT.STRENGTH & variants
-    voice = VARIANT.VOICE & variants
-    mood = VARIANT.MOOD & variants
-    supine = VARIANT.SUPINE & variants
-    clitic = VARIANT.CLITIC & variants
-    misc = VARIANT.MISC & variants
-    data = {
-        "article": article,
-        "case": case,
-        "gender": gender,
-        "number": number,
-        "person": person,
-        "tense": tense,
-        "degree": degree,
-        "strength": strength,
-        "voice": voice,
-        "mood": mood,
-        "supine": supine,
-        "clitic": clitic,
-        "misc": misc,
-        "cat": {head},
-        "obj1": {obj1},
-        "obj2": {obj2},
-        "subj": {subj},
+    data_rest = {
+        "article": VARIANT.ARTICLE & variants,
+        "case": VARIANT.CASES & variants,
+        "gender": VARIANT.GENDERS & variants,
+        "number": VARIANT.NUMBERS & variants,
+        "person": VARIANT.PERSONS & variants,
+        "tense": VARIANT.TENSE & variants,
+        "degree": VARIANT.DEGREE & variants,
+        "strength": VARIANT.STRENGTH & variants,
+        "voice": VARIANT.VOICE & variants,
+        "mood": VARIANT.MOOD & variants,
+        "supine": VARIANT.SUPINE & variants,
+        "clitic": VARIANT.CLITIC & variants,
     }
+    for (k, v) in list(data_rest.items()):
+        data_rest[k] = v.pop() if v else None
 
-    for (k, v) in list(data.items()):
-        data[k] = "_".join(v)
+    data.update(data_rest)
+    for k in list(data.keys()):
+        if not data[k]:
+            del data[k]
 
     return data

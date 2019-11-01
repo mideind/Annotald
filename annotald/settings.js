@@ -229,6 +229,7 @@ const ENUM = {
         obj2: ["nf", "þf", "þgf", "ef"],
         supine: ["sagnb"],
         subj: ["nf", "þf", "þgf", "ef"],
+        impersonal: ["subj", "es", "none"],
         clitic: ["sn"],  // enclitic for second person
     },
     // Variants which allow an empty subvariant
@@ -307,7 +308,7 @@ const ENUM = {
         töl: ["number", "case", "gender"],
         to: ["number", "case", "gender"],
         lo: ["number", "case", "gender", "degree", "strength"],
-        so: ["obj1", "obj2", "subj", "person", "number",
+        so: ["obj1", "obj2", "impersonal", "subj", "person", "number",
              "mood", "tense", "voice", "supine", "clitic"],
         fs: ["obj1"],
         raðnr: ["case", "gender"],
@@ -344,6 +345,9 @@ const ENUM = {
         mm: "voice",
         sagnb: "supine",
         sn: "clitic",
+        es: "impersonal",
+        subj: "impersonal",
+        none: "impersonal",
     },
     VAR_REPR: {
         gender: "Gender",
@@ -358,6 +362,7 @@ const ENUM = {
         voice: "Voice",
         obj1: "Case control 1",
         obj2: "Case control 2",
+        impersonal: "Impersonal",
         subj: "Subject case control",
         supine: "Supine",
         clitic: "2P Clitic",
@@ -662,58 +667,76 @@ function split_flat_terminal(flat_terminal) {
         return false;
     }
     let cat = parts.shift();
-    let head = cat;
 
     let case_control = [];
-    if (head === "so") {
+    if (cat === "so") {
         let first_variant = parts[0];
-        if (["0", "1", "2"].includes(first_variant)) {
+        if (first_variant === "0") {
+            parts.shift();
+        } else if (["1", "2"].includes(first_variant)) {
             parts.shift();
             let num_control = parseInt(first_variant);
             for (let idx=0; idx<num_control; idx++) {
                 let item = parts.shift();
                 if (!ENUM.VAR.case.includes(item)) {
                     console.error("Invalid subvariant: " + item);
-                    return false;
+                    parts.push(item);
                 }
-                case_control.push(item);
+                // case_control.push(item);
+                let key = "obj" + (idx + 1);
+                variants[key] = item;
             }
-        } else {
-            console.error("Illegal flat terminal, missing argument number");
-            return false;
         }
-        // parse subject case control
-        if (parts[0] === "subj" || parts[0] === "op") {
-            parts.shift();
-            parts[0] === "op" ? parts.shift() : null ;
-            subj_case = parts.shift();
-            if (!ENUM.VAR.case.includes(item)) {
-                console.error("Invalid subvariant: " + item);
-                return false;
-            }
 
+        // parse impersonality and subject case control
+        // so_2_obj1_obj2_op
+        // so_2_obj1_obj2_op_es
+        // so_2_obj1_obj2_op_subj
+        if (parts.includes("op") && parts.includes("es")) {
+            parts.splice(parts.indexOf("op"));
+            parts.splice(parts.indexOf("es"));
+            variants.impersonal = "es";
+        } else if (parts.includes("op") && parts.includes("subj")) {
+            variants.impersonal = "subj";
+            let subj_case = "";
+            let idx = parts.indexOf("subj");
+            if (idx + 1 < parts.length) {
+                subj_case = parts.splice(idx + 1, 1);
+            } else {
+                let candidates = ENUM.VAR.case.filter(case_ => parts.includes(case_));
+                if (candidates.length !== 0 ) {
+                    subj_case = candidates.unshift()
+                    parts.splice(parts.indexOf(subj_case));
+                }
+                // else default to empty
+            }
+            variants.subj = subj_case;
+            parts.splice(parts.indexOf("subj"));
+            parts.splice(parts.indexOf("op"));
+        } else if (parts.includes("op")) {
+            variants.supine = "sagnbot";
+            parts.splice(parts.indexOf("op"));
         }
-    } else if (head === "fs") {
-        if (!ENUM.VAR.case.includes(parts[0])) {
-            console.error("Invalid case variant: " + parts[0]);
-            return false;
+    } else if (cat === "fs") {
+        if (parts.length > 0) {
+            let obj1 = parts.shift();
+            if (ENUM.VAR.case.includes(obj1)) {
+                variants["obj1"] = obj1;
+            } else {
+                console.error("Invalid case variant: " + obj1);
+            }
         }
-        case_control = [parts[0]];
-        parts.shift();
     }
 
-    for (let item of parts) {
-        if (!ENUM.SUBVAR_TO_VAR[item]) {
-            console.error("Invalid subvariant: " + item);
-            return false;
-        }
+    let legal_vars = ENUM.CAT_TO_VAR[cat];
+
+    if (cat === "so") {
+        legal_vars = so_terminal_to_legal_variants(flat_terminal);
     }
 
-    let legal_vars = ENUM.CAT_TO_VAR[head];
     if (!legal_vars) {
-        console.log("No variant for terminal");
         return {
-            cat: head,
+            cat: cat,
             variants: variants,
         };
     }
@@ -725,13 +748,8 @@ function split_flat_terminal(flat_terminal) {
         }
     });
 
-    case_control.forEach((item, idx) => {
-        let key = "obj" + (idx + 1);
-        variants[key] = item;
-    });
-
     return {
-        cat: head,
+        cat: cat,
         variants: variants,
     };
 }
@@ -739,35 +757,45 @@ function split_flat_terminal(flat_terminal) {
 /*
  * Flatten variants of a terminal object into canonical flat terminal form
  */
-function terminal_to_flat_terminal(terminal) {
-    let variants = terminal.variants;
+function terminal_to_flat_terminal(node) {
+    let variants = node.variants;
     let head = [];
-    if (terminal.cat === "so") {
-        let governs = [];
-        variants.obj1 ? governs.push(variants.obj1) : 0;
-        governs && variants.obj2 ? governs.push(variants.obj2) : 0;
-        head = [terminal.cat, String(governs.length)];
-        let governs_str = governs.join("_");
-        governs_str ? head.push(governs_str) : 0;
-        if (terminal.variants.subj) {
-            head.push("subj");
+    if (node.cat === "so") {
+        let transitivity = (variants.obj1 ? 1 : 0) + (variants.obj2 ? 1 : 0);
+        head = [node.cat, String(transitivity)];
+        variants.obj1 ? head.push(variants.obj1) : 0;
+        variants.obj2 ? head.push(variants.obj2) : 0;
+
+        if (variants.impersonal === "none") {
             head.push("op");
-            head.push(terminal.variants.subj);
+        } else if (variants.impersonal === "es") {
+            head.push("op");
+            head.push("es");
+        } else if (variants.impersonal === "subj") {
+            head.push("op");
+            head.push("subj");
+            head.push(variants.subj);
         }
+
         head = head.join("_");
-    } else if (terminal.cat === "fs") {
+    } else if (node.cat === "fs") {
         let suffix = variants.obj1 ? ("_" + variants.obj1) : "";
-        head = "" + terminal.cat + suffix;
+        head = "" + node.cat + suffix;
     } else {
-        head = terminal.cat;
+        head = node.cat;
     }
     let tail = [];
-    let variant_names = ENUM.CAT_TO_VAR[terminal.cat];
-    let skip_list = ["obj1", "obj2", "subj"]
-    if (variant_names) {
-        for (let name of variant_names) {
+    let legal_vars = ENUM.CAT_TO_VAR[node.cat];
+    if (legal_vars === undefined) {
+        return node.terminal;
+    }
+    if (node.cat === "so") {
+        legal_vars = so_terminal_to_legal_variants(node.terminal);
+    }
+    let skip_list = ["obj1", "obj2", "subj", "impersonal"]
+    if (legal_vars.length > 0) {
+        for (let name of legal_vars) {
             if (skip_list.includes(name)) {
-                //handle them separately
                 continue;
             }
             variants[name] ? tail.push(variants[name]) : 0;
@@ -782,26 +810,32 @@ function terminal_to_flat_terminal(terminal) {
 function so_terminal_to_legal_variants(flat_terminal) {
     let parts = flat_terminal.split("_");
     let legal_variants = [];
-    let expect_trans = false;  // object case control
     if (parts.includes("lhþt") || (parts.includes("lh") && parts.includes("þt"))) {
-        // number, case, gender, strength, supine
-        // supine should imply et, hk
+        // currently supine is tagged as
+        // köttur getur farið í sólbað
+        // so_gm_sagnb
+        // which makes it easier to refer to supine as a mood than a separate category
+        // legal_variants = ["mood", "number", "case", "gender", "strength", "supine"];
         legal_variants = ["mood", "number", "case", "gender", "strength"];
-        expect_trans = false;
+    } else if (parts.includes("sagnb")) {
+        legal_variants = ["obj1", "obj2", "mood", "voice"];
     } else if (parts.includes("fh") || parts.includes("vh")) {
-        legal_variants = ["obj1", "obj2", "mood", "subj", "person", "number", "tense", "voice", "clitic"];
-        expect_trans = true;
+        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "person", "number", "tense", "voice", "clitic"];
     } else if (parts.includes("bh")) {
-        legal_variants = ["obj1", "obj2", "mood", "subj", "number", "voice", "clitic"];
-        expect_trans = true;
+        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "number", "voice", "clitic"];
     } else if (parts.includes("nh")) {
         legal_variants = ["mood", "voice"];
-        expect_trans = false;
     } else if (parts.includes("lhnt") || (parts.includes("lh") && parts.includes("nt"))) {
         legal_variants = ["mood"];
-        expect_trans = false;
     } else {
-        legal_variants = ["obj1", "obj2", "mood", "voice", "supine"];
+        // base case, covers supine forms
+        // Köttinn gæti langað í eitthvað
+        //   so_0_subj_þf_gm_sagnb
+        // Kötturinn gæti gefið hundinum mat
+        //   so_2_þgf_þf_gm_sagnb
+        // Ég gæti langað ketti mat
+        //   so_2_þgf_þf_gm_sagnb
+        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "voice", "supine"];
     }
     return legal_variants
 }
@@ -1404,9 +1438,7 @@ let leaf_example_so_1 = {
         tense: "nt",
         mood: "vh",
         voice: "gm",
-        supine: "",
         obj1: "þf",
-        obj2: "",
     },
     terminal: "so_1_þf_gm_vh_nt_et_p1"
 };
@@ -1422,7 +1454,6 @@ let leaf_example_so_2 = {
         tense: "þt",
         mood: "vh",
         voice: "gm",
-        supine: "",
         obj1: "þgf",
         obj2: "þf",
     },
@@ -1953,6 +1984,7 @@ function TreeManager() {
         let clones = [];
         this.aug_trees.forEach((item, idx) => {
             let cloned = clone_obj(item);
+            normalize_variants(cloned.tree);
             clones.push(cloned);
         });
         return clones;
@@ -2057,6 +2089,31 @@ function tree_to_text(tree) {
 
     return _tree_to_text_inner(tree).join(" ");
 }
+
+/**
+ * Normalize variants of terminals in tree
+ */
+function normalize_variants(tree) {
+    function normalize_terminal(node) {
+        let flat_terminal = terminal_to_flat_terminal(node);
+        node.terminal = flat_terminal;
+    }
+
+    function visitor(node) {
+        if (node.terminal) {
+            console.log(node.terminal + ":  " + node.text)
+            normalize_terminal(node);
+            return;
+        }
+        console.log(node.nonterminal)
+        for (child of node.children) {
+            visitor(child);
+        }
+    }
+
+    visitor(tree);
+}
+
 
 function ContextMenu(tree_manager) {
 
@@ -2428,7 +2485,6 @@ function customCommands(mgr) {
         nonterminal: not_implemented_fn,
     }));
     addCommand({ keycode: KEYS.D}, mgr.wrap_multiplex({
-        // TODO: subj_case
         terminal: cycle_subvariant_by_variant_name.bind(null, "case", FORWARD),
         nonterminal: cycle_nonterm_short_02.bind(null, FORWARD),
     }));
