@@ -26,12 +26,17 @@ setup_args = {
 
 setup(
     packages=["annotald"],
-    scripts=["bin/annotald", "bin/annoparse"],
     package_data={
         "annotald": ["data/*/*", "settings.py", "settings.js"]
     },
     install_requires=["mako", "cherrypy", "argparse", "nltk", "requests"],
     setup_requires=["setuptools"],
     provides=["annotald"],
+    entry_points={
+        "console_scripts": [
+            "annotald = annotald.treedrawing:main",
+            "annoparse = annotald.reynir_utils:main",
+        ]
+    },
     **setup_args
 )

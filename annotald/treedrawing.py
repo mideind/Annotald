@@ -423,7 +423,9 @@ class Treedraw(object):
         )
 
 
-def _main(argv):
+def main():
+    import sys
+    argv = sys.argv[1:]
     parser = argparse.ArgumentParser(
         description="A program for annotating parsed corpora",
         conflict_handler="resolve",
@@ -510,4 +512,4 @@ def _main(argv):
 
 
 if __name__ == "__main__":
-    _main(sys.argv[1:])
+    main()

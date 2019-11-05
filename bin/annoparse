@@ -1,6 +1,0 @@
-# !/usr/bin/env python3
-
-from annotald import reynir_utils
-
-if __name__ == '__main__':
-    reynir_utils.main()
