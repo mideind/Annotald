@@ -1,8 +1,9 @@
 """
-This Python file uses the following encoding: utf-8
-This file copyright © 2018 by Haukur Barri Símonarson
 
-This file is part of Annotald.
+Copyright (C) 2019 Miðeind ehf.
+Original author: Haukur Barri Símonarson
+
+This file is an addition to Annotald.
 
 Annotald is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free
@@ -24,6 +25,7 @@ intended to be used as a preprocessing step before parsing by hand.
 
 In order to use it, you must first install the ReynirPackage,
    pip install reynir
+
 """
 
 import os
@@ -34,18 +36,16 @@ from collections import namedtuple
 from annotald.annotree import AnnoTree
 
 try:
-    from reynir import Reynir
-    from reynir import correct_spaces
-    from reynir import matcher
-    from reynir import bintokenizer
+    from reynir import (
+        Reynir, correct_spaces, matcher, bintokenizer
+    )
 except ImportError as e:
     print(
-        (
-            "You must first install ReynirPackage before using reynir_utils.py"
-            "(pip install reynir)"
-        )
+        "You must first install ReynirPackage before using reynir_utils.py"
+        "(pip install reynir)"
     )
     sys.exit(1)
+
 
 _NNPARSE_URL = "http://94.130.19.115:5005/nnparse.api"
 
@@ -243,9 +243,9 @@ def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=
     out_path = Path(out_path)
     print("Parsing input file: {0}".format(in_path))
     print("Writing output to: {0}".format(out_path))
-    with in_path.open(mode="r") as in_handle:
+    with in_path.open(mode="r", encoding="utf-8") as in_handle:
         if force_mode == "txt" or (in_path.suffixes and ".txt" == in_path.suffixes[-1]):
-            with Path(out_path).open(mode="w") as out_handle:
+            with Path(out_path).open(mode="w", encoding="utf-8") as out_handle:
                 for tree in parse_text_file(in_handle, id_prefix=in_path.name):
                     formatted_tree = tree.pretty()
                     out_handle.write(formatted_tree)
@@ -258,7 +258,7 @@ def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=
                 bucket_idx += 1
                 bucket_name = "{0}_{1:05d}".format(out_path.stem, bucket_idx)
                 bucket_out_path = (out_path.parent / bucket_name).with_suffix(".psd")
-                with bucket_out_path.open(mode="w") as out_handle:
+                with bucket_out_path.open(mode="w", encoding="utf-8") as out_handle:
                     for (tree_idx, corpus_tree) in enumerate(tree_bucket):
                         tree_idx += 1
                         id_local = "{0},.{1}".format(bucket_out_path.name, tree_idx)
@@ -280,6 +280,7 @@ def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=
 
 
 def main():
+
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -337,4 +338,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()

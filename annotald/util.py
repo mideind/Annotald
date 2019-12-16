@@ -199,7 +199,7 @@ def deepTreeToHtml(tree, *args):
 
 
 def writeTreesToFile(meta, trees_str, filename, reformat=False, fix_indices=False):
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         print(trees_str)
         f.write(trees_str)
 
@@ -250,7 +250,7 @@ def corpusSearchValidate(queryFile):  # pragma: no cover
         )
         subprocess.check_call(cmdline.split(" "))
 
-        with open(name + ".out") as f:
+        with open(name + ".out", encoding="utf-8") as f:
             newtrees = f.read()
         newtrees = scrubText(newtrees)
         os.unlink(name)
