@@ -787,7 +787,7 @@ function terminal_to_flat_terminal(node) {
     let tail = [];
     let legal_vars = ENUM.CAT_TO_VAR[node.cat];
     if (legal_vars === undefined) {
-        return node.terminal;
+        return head;
     }
     if (node.cat === "so") {
         legal_vars = so_terminal_to_legal_variants(node.terminal);

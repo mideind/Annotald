@@ -109,6 +109,8 @@ class Treedraw(object):
         "tools.caching.on": False,
         "tools.encode.on": True,
         "tools.encode.encoding": "utf-8",
+        "tools.expires.on": True,
+        "tools.expires.secs": 3600,
     }
 
     def integrateTrees(self, trees):
