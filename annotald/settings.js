@@ -824,9 +824,9 @@ function so_terminal_to_legal_variants(flat_terminal) {
     } else if (parts.includes("bh")) {
         legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "number", "voice", "clitic"];
     } else if (parts.includes("nh")) {
-        legal_variants = ["mood", "voice"];
+        legal_variants = ["obj1", "obj2", "mood", "voice"];
     } else if (parts.includes("lhnt") || (parts.includes("lh") && parts.includes("nt"))) {
-        legal_variants = ["mood"];
+        legal_variants = ["obj1", "obj2", "mood"];
     } else {
         // base case, covers supine forms
         // Köttinn gæti langað í eitthvað
