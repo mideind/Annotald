@@ -157,6 +157,7 @@ const ENUM = {
             "NP-PRD",
             "NP-SUBJ",
             "NP-TITLE",
+            "NP-COMPANY",
         ],
         S0: [
             "S0",
