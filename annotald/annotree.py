@@ -13,6 +13,8 @@ HTML_RPAREN = "&#41;"
 class VARIANT:
     ARTICLE = {"gr"}
     CASES = {"nf", "þf", "þgf", "ef"}
+    LO_OBJ = {"sþf", "sþgf", "sef"}
+    FS_OBJ = {"nf", "þf", "þgf", "ef", "nh"}
     GENDERS = {"kk", "kvk", "hk"}
     NUMBERS = {"et", "ft"}
     PERSONS = {"p1", "p2", "p3"}
@@ -451,11 +453,6 @@ def split_flat_terminal(term_tok):
             parts.pop(parts.index("nt"))
             parts.append("lhnt")
 
-    elif cat == "fs":
-        if len(parts) > 1 and parts[0] in VARIANT.CASES:
-            data["obj1"] = parts[0]
-            variants_start += 1
-
     variants = set(parts[variants_start:])
 
     data_rest = {
@@ -471,6 +468,8 @@ def split_flat_terminal(term_tok):
         "mood": VARIANT.MOOD & variants,
         "supine": VARIANT.SUPINE & variants,
         "clitic": VARIANT.CLITIC & variants,
+        "lo_obj": VARIANT.LO_OBJ & variants,
+        "fs_obj": VARIANT.FS_OBJ & variants,
     }
     for (k, v) in list(data_rest.items()):
         data_rest[k] = v.pop() if v else None

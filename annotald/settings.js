@@ -366,9 +366,9 @@ const ENUM = {
         subj: "impersonal",
         none: "impersonal",
         op: "impersonal",
-        sþf: "adj_obj",
-        sþgf: "adj_obj",
-        sef: "adj_obj",
+        sþf: "lo_obj",
+        sþgf: "lo_obj",
+        sef: "lo_obj",
     },
     VAR_REPR: {
         gender: "Gender",
@@ -387,7 +387,8 @@ const ENUM = {
         subj: "Subject case control",
         supine: "Supine",
         clitic: "2P Clitic",
-        adj_obj: "Adjectival object control"
+        fs_obj: "Prepositional object control",
+        lo_obj: "Adjectival object control"
     },
     // Cycle groups for which keyboard mappings can be assigned to cycle through
     SHORT_01: {
