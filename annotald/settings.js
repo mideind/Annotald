@@ -247,7 +247,7 @@ const ENUM = {
         impersonal: ["subj", "es", "none"],
         clitic: ["sn"],  // enclitic for second person
         lo_obj: ["sþf", "sþgf", "sef"],
-        fs_obj: ["þf", "þgf", "ef", "nh"],
+        fs_obj: ["nf", "þf", "þgf", "ef", "nh"],
     },
     // Variants which allow an empty subvariant
     VAR_ALLOW_EMPTY_SUBVAR: [
