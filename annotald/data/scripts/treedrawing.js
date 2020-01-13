@@ -586,16 +586,16 @@ function handle_double_click(ev) {
             changed = true;
         }
     } else if ([... element.classList].includes("exp-abbrev-node")) {
-        let res = window.prompt("Expanded abbreviation", node.abbrev);
-        if (res  && res !== "" && res !== node.abbrev) {
-            node.abbrev = res;
+        let res = window.prompt("Expanded abbreviation", node.exp_abbrev);
+        if (res  && res !== "" && res !== node.exp_abbrev) {
+            node.exp_abbrev = res;
             changed = true;
         }
         console.log("handleNodeDoubleClick: edit abbrev");
     } else if ([... element.classList].includes("exp-seg-node")) {
-        let res = window.prompt("Expanded word segmentation", node.seg);
-        if (res  && res !== "" && res !== node.seg) {
-            node.lemma = res;
+        let res = window.prompt("Expanded word segmentation", node.exp_seg);
+        if (res  && res !== "" && res !== node.exp_seg) {
+            node.exp_seg = res;
             changed = true;
         }
     } else if ([... element.classList].includes("tree-flat-terminal")) {

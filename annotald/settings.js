@@ -121,6 +121,7 @@ const ENUM = {
             "ADVP-TMP-SET",
         ],
         PP: [
+            "PP",
             "PP-LOC",
             "PP-DIR",
         ],
@@ -136,6 +137,7 @@ const ENUM = {
             "CP-QUE",
             "CP-QUOTE",
             "CP-REL",
+            "CP-SOURCE",
             "CP-THT",
         ],
         IP: [
@@ -155,6 +157,7 @@ const ENUM = {
             "NP-PERSON",
             "NP-POSS",
             "NP-PRD",
+            "NP-SOURCE",
             "NP-SUBJ",
             "NP-TITLE",
             "NP-COMPANY",
@@ -182,9 +185,12 @@ const ENUM = {
     // All allowed terminal categories
     TERM: [
         "abfn",
+        "abbrev",
         "ao",
         "ártal",
         "dags",
+        "dagsföst",
+        "dagsafs",
         "entity",
         "eo",
         "fn",
@@ -196,21 +202,29 @@ const ENUM = {
         "grm",
         "lén",
         "lo",
+        "mælieining",
+        "myllumerki",
         "nhm",
         "no",
         "person",
+        "p",
         "pfn",
         "prósenta",
         "raðnr",
         "sérnafn",
+        "sequence",
         "so",
         "st",
         "stt",
         "tala",
+        "talameðbókstaf",
         "tímapunktur",
+        "tímapunkturafs",
+        "tímapunkturfast",
         "tími",
         "to",
         "töl",
+        "tölvupóstfang",
         "uh",
         "x",
     ],
@@ -232,6 +246,8 @@ const ENUM = {
         subj: ["nf", "þf", "þgf", "ef"],
         impersonal: ["subj", "es", "none"],
         clitic: ["sn"],  // enclitic for second person
+        lo_obj: ["sþf", "sþgf", "sef"],
+        fs_obj: ["þf", "þgf", "ef", "nh"],
     },
     // Variants which allow an empty subvariant
     VAR_ALLOW_EMPTY_SUBVAR: [
@@ -308,10 +324,10 @@ const ENUM = {
         tala: ["number", "case", "gender"],
         töl: ["number", "case", "gender"],
         to: ["number", "case", "gender"],
-        lo: ["number", "case", "gender", "degree", "strength"],
+        lo: ["number", "case", "gender", "degree", "strength", "lo_obj"],
         so: ["obj1", "obj2", "impersonal", "subj", "person", "number",
              "mood", "tense", "voice", "supine", "clitic"],
-        fs: ["obj1"],
+        fs: ["fs_obj"],
         raðnr: ["case", "gender"],
         lén: ["case"],
     },
@@ -349,6 +365,10 @@ const ENUM = {
         es: "impersonal",
         subj: "impersonal",
         none: "impersonal",
+        op: "impersonal",
+        sþf: "adj_obj",
+        sþgf: "adj_obj",
+        sef: "adj_obj",
     },
     VAR_REPR: {
         gender: "Gender",
@@ -367,6 +387,7 @@ const ENUM = {
         subj: "Subject case control",
         supine: "Supine",
         clitic: "2P Clitic",
+        adj_obj: "Adjectival object control"
     },
     // Cycle groups for which keyboard mappings can be assigned to cycle through
     SHORT_01: {
@@ -908,14 +929,14 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
     }
 
     // expansion
-    // exp-abbrev: a.m.k. becomes að minnsta kosti
-    //    exp-seg: guðfræðinemi becomes guðfræði-nemi
-    if (obj.seg || obj.abbrev) {
-        let exp_class = obj.seg ? "exp-seg-node" : "exp-abbrev-node";
+    // exp-abbrev: 'a.m.k.' becomes 'að minnsta kosti'
+    //    exp-seg: 'guðfræðinemi' becomes 'guðfræði-nemi'
+    if (obj.exp_seg || obj.exp_abbrev) {
+        let exp_class = obj.exp_seg ? "exp-seg-node" : "exp-abbrev-node";
         let classes = ["wnode", "double-click", exp_class];
         let exp_elem = $("<span/>", {
             class: classes.join(" "),
-            text: obj.seg || obj.abbrev
+            text: obj.exp_seg || obj.exp_abbrev
         });
         $(elem).append(exp_elem);
     }
@@ -1253,8 +1274,8 @@ function dom_terminal_elem_to_obj(dom_node) {
         lemma: dom_node.dataset.lemma,
         cat: dom_node.dataset.cat,
         terminal: dom_node.dataset.terminal,
-        abbrev: dom_node.dataset.abbrev,
-        seg: dom_node.dataset.seg,
+        exp_abbrev: dom_node.dataset.exp_abbrev,
+        exp_seg: dom_node.dataset.exp_seg,
         variants: variants
     };
     return term_obj;
@@ -2254,20 +2275,20 @@ function ContextMenu(tree_manager) {
             last_page.push({is_heading: false, value: item});
         }
 
-        let has_abbrev = node.abbrev && node.abbrev !== "";
-        let has_seg = node.seg && node.seg !== "";
+        let has_abbrev = node.exp_abbrev && node.exp_abbrev !== "";
+        let has_seg = node.exp_seg && node.exp_seg !== "";
         let has_lemma = node.lemma && node.lemma !== "";
 
         if (!has_lemma) {
             add_item({action: "add", key: "lemma", value: "Lemma"}, "Add");
         }
         if (!has_seg && !has_abbrev) {
-            add_item({action: "add", key: "seg", value: "Segmentation"}, "Add");
-            add_item({action: "add", key: "abbrev", value: "Abbreviation"}, "Add");
+            add_item({action: "add", key: "exp_seg", value: "Segmentation"}, "Add");
+            add_item({action: "add", key: "exp_abbrev", value: "Abbreviation"}, "Add");
         } else if (has_abbrev) {
-            add_item({action: "remove", key: "abbrev", value: "Abbreviation"}, "Remove");
+            add_item({action: "remove", key: "exp_abbrev", value: "Abbreviation"}, "Remove");
         } else if (has_seg) {
-            add_item({action: "remove", key: "seg", value: "Segmentation"}, "Remove");
+            add_item({action: "remove", key: "exp_seg", value: "Segmentation"}, "Remove");
         }
         if (has_lemma) {
             add_item({action: "remove", key: "lemma", value: "Lemma"}, "Remove");

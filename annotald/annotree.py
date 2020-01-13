@@ -360,11 +360,11 @@ class AnnoTree(nltk.tree.Tree):
                 if "lemma" in tree_dict and tree_dict["lemma"]:
                     escaped_lemma = escape_parens(tree_dict["lemma"])
                     children.append(AnnoTree("lemma", [escaped_lemma]))
-                if "seg" in tree_dict and tree_dict["seg"]:
-                    escaped_seg = escape_parens(tree_dict["seg"])
+                if "exp_seg" in tree_dict and tree_dict["exp_seg"]:
+                    escaped_seg = escape_parens(tree_dict["exp_seg"])
                     children.append(AnnoTree("exp_seg", [escaped_seg]))
-                elif "abbrev" in tree_dict and tree_dict["abbrev"]:
-                    escaped_abbrev = escape_parens(tree_dict["abbrev"])
+                elif "exp_abbrev" in tree_dict and tree_dict["exp_abbrev"]:
+                    escaped_abbrev = escape_parens(tree_dict["exp_abbrev"])
                     children.append(AnnoTree("exp_abbrev", [escaped_abbrev]))
 
                 node = AnnoTree(flat_terminal, children)
