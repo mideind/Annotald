@@ -235,14 +235,14 @@ const ENUM = {
         case: ["nf", "þf", "þgf", "ef"],
         article: ["gr"],
         person: ["p3", "p2", "p1"],
-        mood: ["fh", "vh", "nh", "bh", "lhnt", "lhþt"],
+        mood: ["fh", "vh", "nh", "bh", "lhnt", "lhþt", "sagnb"],
         tense: ["nt", "þt"],
         degree: ["fst", "mst", "est"],
         strength: ["sb", "vb"],
         voice: ["gm", "mm"],
         obj1: ["nf", "þf", "þgf", "ef"],
         obj2: ["nf", "þf", "þgf", "ef"],
-        supine: ["sagnb"],
+        // supine: ["sagnb"],
         subj: ["nf", "þf", "þgf", "ef"],
         impersonal: ["subj", "es", "none"],
         clitic: ["sn"],  // enclitic for second person
@@ -360,7 +360,7 @@ const ENUM = {
         vb: "strength",
         gm: "voice",
         mm: "voice",
-        sagnb: "supine",
+        sagnb: "mood",
         sn: "clitic",
         es: "impersonal",
         subj: "impersonal",
@@ -385,7 +385,7 @@ const ENUM = {
         obj2: "Case control 2",
         impersonal: "Impersonal",
         subj: "Subject case control",
-        supine: "Supine",
+        // supine: "Supine",
         clitic: "2P Clitic",
         fs_obj: "Prepositional object control",
         lo_obj: "Adjectival object control"
@@ -736,9 +736,9 @@ function split_flat_terminal(flat_terminal) {
             variants.subj = subj_case;
             parts.splice(parts.indexOf("subj"));
             parts.splice(parts.indexOf("op"));
-        } else if (parts.includes("op")) {
-            variants.supine = "sagnbot";
-            parts.splice(parts.indexOf("op"));
+        } else if (parts.includes("op") && parts.includes("none")) {
+            // variants.supine = "sagnbot";
+            // parts.splice(parts.indexOf("op"));
         }
     } else if (cat === "fs") {
         if (parts.length > 0) {
@@ -858,7 +858,7 @@ function so_terminal_to_legal_variants(flat_terminal) {
         //   so_2_þgf_þf_gm_sagnb
         // Ég gæti langað ketti mat
         //   so_2_þgf_þf_gm_sagnb
-        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "voice", "supine"];
+        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "voice"];
     }
     return legal_variants
 }

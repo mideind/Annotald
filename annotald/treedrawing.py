@@ -414,14 +414,18 @@ class Treedraw(object):
     def parse_single(self, data=None):
         data = data or cherrypy.request.json
         text = data["text"]
+        print(text)
         annotree = reynir_utils.parse_single(text)
+        print(annotree)
         if annotree is None:
             annotree = reynir_utils.request_parse_single(text)
             if annotree is None:
                 return dict(result="failure", reason="server got an exception")
+        json_str = annotree.to_json()
+        print(json_str)
         return dict(
             result="success",
-            aug_tree=annotree.to_json(),
+            aug_tree=json_str,
         )
 
 
