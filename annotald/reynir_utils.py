@@ -173,6 +173,7 @@ def reynir_sentence_to_annotree(sent):
         nltk_tree = simpleTree2NLTK(sent.tree)
     else:
         nltk_tree = tok_stream_to_null_reynir([tok.txt for tok in sent._s if tok])
+    nltk_tree = AnnoTree("", [nltk_tree])
     return nltk_tree
 
 
@@ -180,10 +181,10 @@ def parse_single(text):
     """ Parse a single sentence into reynir simple trees in bracket format """
     r = Reynir()
     sent = r.parse_single(text)
-    tree = sent.tree
-    if tree:
-        tree = reynir_sentence_to_annotree(tree)
-    return tree
+    if sent and sent.tree:
+        tree = reynir_sentence_to_annotree(sent)
+        return tree
+    return None
 
 
 def parse_text_file(file_handle, affix_lemma=1, id_prefix=None, start_index=1):
