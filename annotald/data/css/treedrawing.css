@@ -594,7 +594,7 @@ div.nonterminal-ip {
     border-left: 4px solid #3a963a;
 }
 
-.terminal-dagsfast {
+.terminal-dagsföst {
     background: #bffa90;
     border-left: 4px solid #3a963a;
 }
@@ -659,6 +659,14 @@ div.nonterminal-ip {
     border-left: 4px solid #3a963a;
 }
 
+.terminal-tímapunkturafs {
+    background: #bffa90;
+    border-left: 4px solid #3a963a;
+}
+.terminal-tímapunkturfast {
+    background: #bffa90;
+    border-left: 4px solid #3a963a;
+}
 .terminal-tími {
     background: #bffa90;
     border-left: 4px solid #3a963a;
