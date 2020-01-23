@@ -12,12 +12,12 @@ HTML_RPAREN = "&#41;"
 
 class VARIANT:
     ARTICLE = {"gr"}
-    CASES = {"nf", "þf", "þgf", "ef"}
+    CASE = {"nf", "þf", "þgf", "ef"}
     LO_OBJ = {"sþf", "sþgf", "sef"}
     FS_OBJ = {"nf", "þf", "þgf", "ef", "nh"}
-    GENDERS = {"kk", "kvk", "hk"}
-    NUMBERS = {"et", "ft"}
-    PERSONS = {"p1", "p2", "p3"}
+    GENDER = {"kk", "kvk", "hk"}
+    NUMBER = {"et", "ft"}
+    PERSON = {"p1", "p2", "p3"}
     TENSE = {"þt", "nt"}
     DEGREE = {"fst", "mst", "est", "esb", "evb"}
     STRENGTH = {"sb", "vb"}
@@ -26,6 +26,32 @@ class VARIANT:
     SUPINE = {"sagnb"}
     CLITIC = {"sn"}
     IMPERSONAL = {"none", "es", "subj"}
+
+
+CATEGORY_TO_VARIANT = {
+    "ao": ["degree"],
+    "eo": ["degree"],
+    "no": ["number", "case", "gender", "article"],
+    "person": ["number", "case", "gender", "article"],
+    "entity": ["number", "case", "gender", "article"],
+    "sérnafn": ["number", "case", "gender", "article"],
+    "abfn": ["number", "case", "gender"],
+    "fn": ["number", "case", "gender"],
+    "pfn": ["number", "case", "gender", "person"],
+    "gr": ["number", "case", "gender"],
+    "tala": ["number", "case", "gender"],
+    "töl": ["number", "case", "gender"],
+    "to": ["number", "case", "gender"],
+    "lo": ["number", "case", "gender", "degree", "strength", "lo_obj"],
+    "so": ["obj1", "obj2", "impersonal", "subj", "person", "number",
+            "mood", "tense", "voice", "supine", "clitic"],
+    "fs": ["fs_obj"],
+    "raðnr": ["case", "gender"],
+    "lén": ["case"],
+    "prósenta": ["number", "case", "gender"],
+    "fyrirtæki": ["number", "case", "gender", "article"],
+    "gata": ["number", "case", "gender", "article"],
+}
 
 
 def escaped_parens_to_html_parens(text):
@@ -417,7 +443,7 @@ def split_flat_terminal(term_tok):
             # so_2_þgf_þf_þt_vh_p1    gæfi honum mat
             for idx in range(num_control):
                 var = parts[2 + idx]
-                if var in VARIANT.CASES:
+                if var in VARIANT.CASE:
                     variants_start += 1
                     data["obj" + str(idx + 1)] = var
 
@@ -425,7 +451,7 @@ def split_flat_terminal(term_tok):
             # so_1_þgf_op_subj_nf_þt_fh_p1_mm | mér gafst ekki tækifæri
             parts.pop(parts.index("subj"))
             data["impersonal"] = "subj"
-            subj = [var for var in parts[variants_start:] if var in VARIANT.CASES]
+            subj = [var for var in parts[variants_start:] if var in VARIANT.CASE]
             if subj:
                 subj = subj.pop()
                 data["subj"] = subj
@@ -455,22 +481,34 @@ def split_flat_terminal(term_tok):
 
     variants = set(parts[variants_start:])
 
-    data_rest = {
-        "article": VARIANT.ARTICLE & variants,
-        "case": VARIANT.CASES & variants,
-        "gender": VARIANT.GENDERS & variants,
-        "number": VARIANT.NUMBERS & variants,
-        "person": VARIANT.PERSONS & variants,
-        "tense": VARIANT.TENSE & variants,
-        "degree": VARIANT.DEGREE & variants,
-        "strength": VARIANT.STRENGTH & variants,
-        "voice": VARIANT.VOICE & variants,
-        "mood": VARIANT.MOOD & variants,
-        "supine": VARIANT.SUPINE & variants,
-        "clitic": VARIANT.CLITIC & variants,
-        "lo_obj": VARIANT.LO_OBJ & variants,
-        "fs_obj": VARIANT.FS_OBJ & variants,
-    }
+    try:
+        from icecream import ic
+        ic.configureOutput(includeContext=True)
+    except ImportError:  # Graceful fallback if IceCream isn't installed.
+        ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+
+    variant_names = (
+        "article",
+        "case",
+        "gender",
+        "number",
+        "person",
+        "tense",
+        "degree",
+        "strength",
+        "voice",
+        "mood",
+        "supine",
+        "clitic",
+        "lo_obj",
+        "fs_obj"
+    )
+    data_rest = dict()
+    for variant_name in variant_names:
+        if cat in CATEGORY_TO_VARIANT and variant_name in CATEGORY_TO_VARIANT[cat]:
+            all_subvariants = getattr(VARIANT, variant_name.upper())
+            data_rest[variant_name] = all_subvariants & variants
+
     for (k, v) in list(data_rest.items()):
         data_rest[k] = v.pop() if v else None
 

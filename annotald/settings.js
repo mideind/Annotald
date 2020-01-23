@@ -330,6 +330,9 @@ const ENUM = {
         fs: ["fs_obj"],
         raðnr: ["case", "gender"],
         lén: ["case"],
+        prósenta: ["number", "case", "gender"],
+        fyrirtæki: ["number", "case", "gender", "article"],
+        gata: ["number", "case", "gender", "article"],
     },
     SUBVAR_TO_VAR: {
         kk: "gender",
@@ -750,12 +753,14 @@ function split_flat_terminal(flat_terminal) {
             }
         }
     }
-
     let legal_vars = ENUM.CAT_TO_VAR[cat];
 
     if (cat === "so") {
         legal_vars = so_terminal_to_legal_variants(flat_terminal);
+    } else if (cat === "lo") {
+        legal_vars = lo_terminal_to_legal_variants(flat_terminal);
     }
+
 
     if (!legal_vars) {
         return {
@@ -815,6 +820,9 @@ function terminal_to_flat_terminal(node) {
     if (node.cat === "so") {
         legal_vars = so_terminal_to_legal_variants(node.terminal);
     }
+    else if (node.cat === "lo") {
+        legal_vars = lo_terminal_to_legal_variants(node.terminal);
+    }
     let skip_list = ["obj1", "obj2", "subj", "impersonal"]
     if (legal_vars.length > 0) {
         for (let name of legal_vars) {
@@ -834,22 +842,18 @@ function so_terminal_to_legal_variants(flat_terminal) {
     let parts = flat_terminal.split("_");
     let legal_variants = [];
     if (parts.includes("lhþt") || (parts.includes("lh") && parts.includes("þt"))) {
-        // currently supine is tagged as
-        // köttur getur farið í sólbað
-        // so_gm_sagnb
-        // which makes it easier to refer to supine as a mood than a separate category
-        // legal_variants = ["mood", "number", "case", "gender", "strength", "supine"];
-        legal_variants = ["mood", "number", "case", "gender", "strength"];
+        legal_variants = ["obj1", "mood", "number", "case", "gender", "strength"];
     } else if (parts.includes("sagnb")) {
+        // we treat supine as a mood
         legal_variants = ["obj1", "obj2", "mood", "voice"];
     } else if (parts.includes("fh") || parts.includes("vh")) {
         legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "person", "number", "tense", "voice", "clitic"];
     } else if (parts.includes("bh")) {
-        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj", "number", "voice", "clitic"];
+        legal_variants = ["obj1", "obj2", "mood", "number", "voice", "clitic"];
     } else if (parts.includes("nh")) {
-        legal_variants = ["obj1", "obj2", "mood", "voice"];
+        legal_variants = ["obj1", "obj2", "mood", "voice", "impersonal", "subj"];
     } else if (parts.includes("lhnt") || (parts.includes("lh") && parts.includes("nt"))) {
-        legal_variants = ["obj1", "obj2", "mood"];
+        legal_variants = ["obj1", "obj2", "mood", "impersonal", "subj"];
     } else {
         // base case, covers supine forms
         // Köttinn gæti langað í eitthvað
@@ -862,6 +866,19 @@ function so_terminal_to_legal_variants(flat_terminal) {
     }
     return legal_variants
 }
+
+function lo_terminal_to_legal_variants(flat_terminal) {
+    let parts = flat_terminal.split("_");
+    // TODO: fixme
+    let legal_variants = [];
+    if (parts.includes("mst") || parts.includes("evb") || parts.includes("evb")) {
+        legal_variants = ["number", "case", "gender", "degree", "lo_obj"];
+    } else {
+        legal_variants = [... ENUM.CAT_TO_VAR.lo];
+    }
+    return legal_variants;
+}
+
 
 /*
  * Create a DOM terminal object from a terminal object
@@ -896,8 +913,17 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
     terminal_elem.append(term_cat);
 
     let legal_vars = ENUM.CAT_TO_VAR[obj.cat];
+
+    if (obj.text === "hefðbundin") {
+        console.log(obj)
+        debugger;
+    }
+
     if (obj.cat === "so") {
         legal_vars = so_terminal_to_legal_variants(obj.terminal);
+    }
+    else if (obj.cat === "lo") {
+        legal_vars = lo_terminal_to_legal_variants(obj.terminal);
     }
     let ordered_vars = [];
     if (legal_vars) {
@@ -1970,7 +1996,7 @@ function TreeManager() {
 
     /*
      * Contract current selection towards the left (from rightmost element),
-     * only succeeds if current selection has is longer than a single node
+     * only succeeds if current selection has more than a single node
      */
     this.contract_selection_from_right = () => {
         if (!this.has_selection()) {
