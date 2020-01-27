@@ -544,6 +544,51 @@ div.nonterminal-ip {
     border-left: 4px solid #115895;
 }
 
+.terminal-notandanafn {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-myllumerki {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-kennitala {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-mælieining {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-sameind {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-tölvupóstfang {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-vefslóð {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-símanúmer {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
+.terminal-vörunúmer {
+    background: #bae3ff;
+    border-left: 4px solid #115895;
+}
+
 .terminal-fn {
     background: #90fad0;
     border-left: 4px solid #4da08c;
