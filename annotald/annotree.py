@@ -22,8 +22,7 @@ class VARIANT:
     DEGREE = {"fst", "mst", "est", "esb", "evb"}
     STRENGTH = {"sb", "vb"}
     VOICE = {"mm", "gm"}
-    MOOD = {"fh", "vh", "nh", "bh", "lhnt", "lhþt"}
-    SUPINE = {"sagnb"}
+    MOOD = {"fh", "vh", "nh", "bh", "lhnt", "lhþt", "sagnb"}
     CLITIC = {"sn"}
     IMPERSONAL = {"none", "es", "subj"}
 
@@ -44,7 +43,7 @@ CATEGORY_TO_VARIANT = {
     "to": ["number", "case", "gender"],
     "lo": ["number", "case", "gender", "degree", "strength", "lo_obj"],
     "so": ["obj1", "obj2", "impersonal", "subj", "person", "number",
-            "mood", "tense", "voice", "supine", "clitic"],
+            "mood", "tense", "voice", "clitic"],
     "fs": ["fs_obj"],
     "raðnr": ["case", "gender"],
     "lén": ["case"],
@@ -498,7 +497,6 @@ def split_flat_terminal(term_tok):
         "strength",
         "voice",
         "mood",
-        "supine",
         "clitic",
         "lo_obj",
         "fs_obj"

@@ -914,11 +914,6 @@ function terminal_obj_to_dom_elem(obj, path, tree_index) {
 
     let legal_vars = ENUM.CAT_TO_VAR[obj.cat];
 
-    if (obj.text === "hefðbundin") {
-        console.log(obj)
-        debugger;
-    }
-
     if (obj.cat === "so") {
         legal_vars = so_terminal_to_legal_variants(obj.terminal);
     }
