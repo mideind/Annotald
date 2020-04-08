@@ -35,16 +35,18 @@ from collections import namedtuple
 
 from annotald.annotree import AnnoTree
 
-try:
-    from reynir import (
-        Reynir, correct_spaces, matcher, bintokenizer
-    )
-except ImportError as e:
-    print(
-        "You must first install ReynirPackage before using reynir_utils.py"
-        "(pip install reynir)"
-    )
-    sys.exit(1)
+# This part is only needed for annoparse
+
+#try:
+#     from reynir import (
+#        Reynir, correct_spaces, matcher, bintokenizer
+#    )
+#except ImportError as e:
+#    print(
+#        "You must first install ReynirPackage before using reynir_utils.py"
+#        "(pip install reynir)"
+#    )
+#    sys.exit(1)
 
 
 _NNPARSE_URL = "http://94.130.19.115:5005/nnparse.api"
