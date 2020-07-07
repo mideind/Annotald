@@ -187,7 +187,7 @@ def parse_single(text):
     return None
 
 
-def parse_text_file(file_handle, affix_lemma=1, id_prefix=None, start_index=1):
+def parse_text_file(file_handle, affix_lemma=1, id_prefix=None, start_index=1, ispl=False):
     """ Parse contiguous text into reynir simple trees in bracket format """
     text = file_handle.read()
     r = Reynir()
@@ -240,14 +240,14 @@ def parse_tsv_file(file_handle, reorder=True):
         yield CorpusTree(id_corpus=id_corpus, tree=first, url=entry.url)
 
 
-def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=10):
+def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=10, ispl=False):
     out_path = Path(out_path)
     print("Parsing input file: {0}".format(in_path))
     print("Writing output to: {0}".format(out_path))
     with in_path.open(mode="r", encoding="utf-8") as in_handle:
         if force_mode == "txt" or (in_path.suffixes and ".txt" == in_path.suffixes[-1]):
             with Path(out_path).open(mode="w", encoding="utf-8") as out_handle:
-                for tree in parse_text_file(in_handle, id_prefix=in_path.name):
+                for tree in parse_text_file(in_handle, id_prefix=in_path.name, ispl):
                     formatted_tree = tree.pretty()
                     out_handle.write(formatted_tree)
                     out_handle.write("\n\n")
@@ -326,15 +326,26 @@ def main():
         help="Reorder trees in ascending number of leaves",
     )
 
+    parser.add_argument(
+    "--ispl",
+    help="Input contains one sentence per line in a .txt file",
+    action="store_true"
+    )
+
     args = parser.parse_args()
     out_path = args.out_path
     if out_path is None:
         out_path = args.in_path.with_suffix(".psd")
+    fm = None
+    if args.ispl:
+        fm = "txt"
     annotate_file(
         args.in_path,
         out_path,
         bucket_size=args.bucket_size,
         reorder=not args.no_reorder,
+        outformat=args.ispl
+        force_mode = fm
     )
 
 
