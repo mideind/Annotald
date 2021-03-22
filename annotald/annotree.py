@@ -114,11 +114,17 @@ class AnnoTree(nltk.tree.Tree):
         token_text = " ".join([child for child in tree if isinstance(child, str)])
         return token_text
 
+    @classmethod
+    def children(cls, tree):
+        return [ child for child in tree if isinstance(child, AnnoTree)]
+
+
     def to_json(self):
         metadata = self.get_metadata()
         top_level_nodes = {child.label(): child for child in self}
         _ = top_level_nodes.pop("META", None)
         real_root = next(iter(top_level_nodes.values()))
+        print(real_root)
         return {"tree": self._to_json_inner(real_root), "meta": metadata}
 
     def get_metadata(self):

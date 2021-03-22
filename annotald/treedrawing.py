@@ -231,9 +231,9 @@ class Treedraw(object):
         currentTree = self.readTrees(
             None,
             text="""
-( (IP-MAT (NP-SBJ (D This)) (BEP is) (NP-PRD (D a) (N test)))
-  (ID test-01))
-""",
+            ( (IP-MAT (NP-SBJ (D This)) (BEP is) (NP-PRD (D a) (N test)))
+            (ID test-01))
+            """,
         )
         currentTree = self.treesToHtml(currentTree)
 
@@ -464,7 +464,7 @@ def main():
         dest="timelog",
         action="store_false",
         help="boolean for specifying whether you'd like to \
-    silence the timelogging",
+              silence the timelogging",
     )
     parser.add_argument(
         "-S",

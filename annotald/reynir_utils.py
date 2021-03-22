@@ -32,12 +32,14 @@ import os
 from pathlib import Path
 import sys
 from collections import namedtuple
+import argparse
+
 
 from annotald.annotree import AnnoTree
 
 try:
     from reynir import (
-        Reynir, correct_spaces, matcher, bintokenizer
+        Greynir, correct_spaces, matcher, bintokenizer
     )
 except ImportError as e:
     print(
@@ -80,6 +82,9 @@ SPECIAL_VERBS = frozenset(_SPECIAL_VERB_MAP.keys())
 
 CorpusTree = namedtuple("CorpusTree", "id_corpus, tree, url")
 CorpusEntry = namedtuple("CorpusEntry", "flags, uuid, index, text, url")
+
+
+
 
 
 def bucketize(iterable, bucket_size):
@@ -187,10 +192,10 @@ def parse_single(text):
     return None
 
 
-def parse_text_file(file_handle, affix_lemma=1, id_prefix=None, start_index=1):
+def parse_text_file(file_handle, affix_lemma=1, id_prefix=None, start_index=1, **options):
     """ Parse contiguous text into reynir simple trees in bracket format """
     text = file_handle.read()
-    r = Reynir()
+    r = Greynir(**options)
     dd = r.parse(text)
     for idx, sent in enumerate(dd["sentences"]):
         nltk_tree = reynir_sentence_to_annotree(sent)
@@ -240,14 +245,14 @@ def parse_tsv_file(file_handle, reorder=True):
         yield CorpusTree(id_corpus=id_corpus, tree=first, url=entry.url)
 
 
-def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=10):
+def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=10, **options):
     out_path = Path(out_path)
     print("Parsing input file: {0}".format(in_path))
     print("Writing output to: {0}".format(out_path))
     with in_path.open(mode="r", encoding="utf-8") as in_handle:
         if force_mode == "txt" or (in_path.suffixes and ".txt" == in_path.suffixes[-1]):
             with Path(out_path).open(mode="w", encoding="utf-8") as out_handle:
-                for tree in parse_text_file(in_handle, id_prefix=in_path.name):
+                for tree in parse_text_file(in_handle, id_prefix=in_path.name, **options):
                     formatted_tree = tree.pretty()
                     out_handle.write(formatted_tree)
                     out_handle.write("\n\n")
@@ -282,10 +287,10 @@ def annotate_file(in_path, out_path, force_mode=None, reorder=True, bucket_size=
 
 def main():
 
-    import argparse
+    options = dict()
 
     parser = argparse.ArgumentParser(
-        "Parse a text file of contiguous text into Reynir parse trees"
+        "Parse a text file of contiguous text into Greynir parse trees"
     )
 
     def file_type_guard(path):
@@ -326,15 +331,27 @@ def main():
         help="Reorder trees in ascending number of leaves",
     )
 
+    parser.add_argument(
+        "-s",
+        "--one_sent_per_line",
+        action="store_true",
+        help="Input contains one sentence per line",
+    )
+
     args = parser.parse_args()
     out_path = args.out_path
     if out_path is None:
         out_path = args.in_path.with_suffix(".psd")
+
+    if args.one_sent_per_line:
+        options["one_sent_per_line"] = True
+
     annotate_file(
         args.in_path,
         out_path,
         bucket_size=args.bucket_size,
         reorder=not args.no_reorder,
+        **options
     )
 
 
