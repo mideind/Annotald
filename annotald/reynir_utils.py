@@ -178,7 +178,6 @@ def reynir_sentence_to_annotree(sent):
         nltk_tree = simpleTree2NLTK(sent.tree)
     else:
         nltk_tree = tok_stream_to_null_reynir([tok.txt for tok in sent._s if tok])
-    nltk_tree = AnnoTree("", [nltk_tree])
     return nltk_tree
 
 
