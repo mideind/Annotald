@@ -196,8 +196,8 @@ class Treedraw(object):
             return {"result": "success"}
         evtTime = time.time()
         eventData["filename"] = self.options.psd[0]
-        with open("annotaldLog.txt", "a", encoding="utf-8") as f:
-            f.write(str(evtTime) + ": " + json.dumps(eventData) + "\n")
+        #with open("annotaldLog.txt", "a", encoding="utf-8") as f:
+        #    f.write(str(evtTime) + ": " + json.dumps(eventData) + "\n")
         return dict(result="success")
 
     @cherrypy.expose
